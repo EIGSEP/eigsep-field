@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+dist/
+build/
+wheels/*.whl
+wheels/*.tar.gz
+wheels/index/
+wheels/requirements.txt
+/tmp-image/
+*.img
+*.img.tar.xz

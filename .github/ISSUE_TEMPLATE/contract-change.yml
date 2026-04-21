@@ -1,0 +1,56 @@
+name: Contract change
+description: Propose a change to a cross-repo interface (keys, SENSOR_SCHEMAS, writer/reader method, redis_handler output).
+title: "[contract] "
+labels: [contract-change]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this when you want to change a surface that crosses repo boundaries — anything in `eigsep_redis/keys.py`, `eigsep_observing/io.py:SENSOR_SCHEMAS`, the writer/reader method signatures, or a picohost `redis_handler` output shape.
+
+        Single-repo bugs do **not** belong here — file them in the relevant sibling repo.
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: Why does this contract need to change? What is currently broken or limited?
+    validations: { required: true }
+  - type: textarea
+    id: affected
+    attributes:
+      label: Affected contract surface
+      description: Paste the current `keys.py` / `SENSOR_SCHEMAS` / method signature. Link to the line.
+      placeholder: |
+        e.g. `eigsep_observing/src/eigsep_observing/io.py:SENSOR_SCHEMAS["imu_el"]` — adding `gyro_x/y/z` fields
+    validations: { required: true }
+  - type: textarea
+    id: proposed
+    attributes:
+      label: Proposed new shape
+      description: Show the new shape in full.
+    validations: { required: true }
+  - type: checkboxes
+    id: repos
+    attributes:
+      label: Downstream repos impacted
+      description: Which sibling repos need synchronized PRs?
+      options:
+        - label: eigsep_redis
+        - label: pico-firmware (picohost)
+        - label: cmt_vna
+        - label: eigsep_observing
+        - label: pyvalon
+        - label: pico-firmware (C firmware)
+        - label: eigsep_dac
+  - type: textarea
+    id: migration
+    attributes:
+      label: Migration plan
+      description: Version bump per repo, merge order, any data-on-disk migration, fallback for in-flight data.
+    validations: { required: true }
+  - type: input
+    id: target
+    attributes:
+      label: Target eigsep-field release
+      description: Which calver release should ship this? e.g. `2026.05`
+    validations: { required: true }

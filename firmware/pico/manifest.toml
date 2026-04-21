@@ -1,0 +1,13 @@
+# Per-firmware local manifest. Mirrors the [firmware.pico] table in the
+# top-level manifest.toml. Kept here for standalone inspection and to
+# carry build notes that don't belong in the release manifest.
+
+version = "v3.0.0"
+asset   = "pico-firmware-v3.0.0.uf2"
+source  = "https://github.com/EIGSEP/pico-firmware"
+tag     = "v3.0.0"
+sha256  = ""
+
+# Notes:
+#   Targets: RP2350 (eigsep_dac uses RP2040 variants — separate artifact)
+#   Flash via: picotool load -f <asset> && picotool reboot

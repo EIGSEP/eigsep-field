@@ -1,0 +1,39 @@
+name: Stack bug
+description: A bug that crosses ≥2 repos. Single-repo bugs go to the home repo.
+title: "[stack-bug] "
+labels: [stack-bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this for bugs where the fix requires changes in more than one repo, or where the root cause is ambiguous across the producer/consumer boundary (e.g. producer emits a field the consumer doesn't expect).
+
+        If the bug lives entirely within one package, file it there instead — see the links when you click "New Issue".
+  - type: textarea
+    id: symptom
+    attributes:
+      label: Observed symptom
+      description: What went wrong in the field or in tests?
+    validations: { required: true }
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction (must touch ≥2 repos)
+      description: Steps to reproduce. Name the specific packages involved.
+    validations: { required: true }
+  - type: textarea
+    id: suspected_contract
+    attributes:
+      label: Suspected contract involvement
+      description: If a contract surface is implicated, link to `keys.py`/`SENSOR_SCHEMAS`/method.
+  - type: textarea
+    id: supersedes
+    attributes:
+      label: Supersedes single-repo issues (optional)
+      description: Links to any sibling-repo issues this umbrellas.
+  - type: input
+    id: release
+    attributes:
+      label: eigsep-field release running
+      description: e.g. `2026.04.0` — from `eigsep-field info`.
+    validations: { required: true }

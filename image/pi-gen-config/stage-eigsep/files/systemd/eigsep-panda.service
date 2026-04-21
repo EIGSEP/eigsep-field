@@ -1,0 +1,16 @@
+[Unit]
+Description=EIGSEP PandaClient (producer side)
+After=network-online.target redis-server.service
+Wants=redis-server.service
+PartOf=eigsep.target
+
+[Service]
+Type=simple
+User=eigsep
+ExecStart=/opt/eigsep/venv/bin/python -m eigsep_observing.client
+Restart=on-failure
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=eigsep.target

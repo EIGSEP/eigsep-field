@@ -1,0 +1,89 @@
+# Blessed version tuple for one EIGSEP field release.
+#
+# This is the single source of truth. pyproject.toml's [project.version]
+# and [project.dependencies] are injected from here at build time by
+# scripts/hatch_manifest_hook.py. Do not edit those fields directly.
+#
+# After editing this file, run `./scripts/refresh-lock.sh` to regenerate
+# uv.lock, requirements.txt, and requirements-hashed.txt.
+
+release      = "2026.4.0"
+python       = "3.11"
+released_at  = "2026-04-21"
+notes        = "docs/releases/2026.4.0.md"
+
+# ---- Python packages (appear in wheelhouse + meta-package deps) ----
+
+[packages.eigsep_redis]
+pypi    = "eigsep_redis"
+version = "2.1.0"
+tag     = "v2.1.0"
+source  = "https://github.com/EIGSEP/eigsep_redis"
+# sha256 of the sdist on PyPI; populated by scripts/refresh-lock.sh
+sha256  = ""
+
+[packages.picohost]
+pypi    = "picohost"
+version = "3.0.0"
+tag     = "v3.0.0"
+source  = "https://github.com/EIGSEP/pico-firmware"
+sha256  = ""
+
+[packages.eigsep-vna]
+pypi    = "eigsep-vna"
+version = "1.3.0"
+tag     = "v1.3.0"
+source  = "https://github.com/EIGSEP/cmt_vna"
+sha256  = ""
+
+[packages.eigsep_observing]
+pypi    = "eigsep_observing"
+version = "1.0.0"
+tag     = "v1.0.0"
+source  = "https://github.com/EIGSEP/eigsep_observing"
+sha256  = ""
+
+[packages.pyvalon]
+pypi    = "pyvalon"
+version = "0.1.0"
+tag     = "v0.1.0"
+source  = "https://github.com/EIGSEP/pyvalon"
+sha256  = ""
+
+# ---- Firmware artifacts (not pip-installable; checksummed blobs) ----
+
+[firmware.pico]
+# Flashed to the Raspberry Pi Pico(s) via picotool.
+version = "v3.0.0"
+asset   = "pico-firmware-v3.0.0.uf2"
+source  = "https://github.com/EIGSEP/pico-firmware"
+tag     = "v3.0.0"
+sha256  = ""
+
+[firmware.rfsoc_bitstream]
+# Produced by a script in eigsep_dac; flashed to the RFSoC. eigsep_dac is
+# not release-managed, so we pin by commit SHA. loader.py is vendored at
+# this commit into firmware/rfsoc/loader.py.
+version = "2026-04-01"
+asset   = "eigsep_vivaldi_2026-04-01.npz"
+source  = "https://github.com/EIGSEP/eigsep_dac"
+commit  = ""
+sha256  = ""
+
+# ---- RPi image artifact (hashes are published as sidecar .sha256 in the
+# Release because the image is built from this manifest — chicken-and-egg).
+
+[image]
+tag   = "v2026.4.0"
+asset = "eigsep-field-2026.4.0.img.tar.xz"
+
+# ---- Out-of-band pins (system packages baked into the image) ----
+
+[system]
+# Debian package version of redis-server installed by pi-gen. eigsep_redis
+# is the code contract; this pins the server.
+redis_server_apt = "7:7.0.15-1"
+# Target platform for the wheelhouse. Field deployment is Pi4 running
+# 64-bit Raspberry Pi OS, so aarch64. (Pi4 also supports 32-bit armv7l
+# but we're not using that variant.)
+platform = "linux_aarch64"

@@ -1,0 +1,23 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Bug in eigsep_redis
+    url: https://github.com/EIGSEP/eigsep_redis/issues/new
+    about: Redis transport / writer-reader / keys. Open the issue there, not here.
+  - name: Bug in eigsep_observing
+    url: https://github.com/EIGSEP/eigsep_observing/issues/new
+    about: Orchestrator, SENSOR_SCHEMAS, corr loop, VNA packaging.
+  - name: Bug in picohost / pico-firmware
+    url: https://github.com/EIGSEP/pico-firmware/issues/new
+    about: Pico device host library or firmware.
+  - name: Bug in cmt_vna
+    url: https://github.com/EIGSEP/cmt_vna/issues/new
+    about: VNA control library.
+  - name: Bug in pyvalon
+    url: https://github.com/EIGSEP/pyvalon/issues/new
+    about: Valon synthesizer CLI.
+  - name: Bug in eigsep_dac
+    url: https://github.com/EIGSEP/eigsep_dac/issues/new
+    about: RFSoC bitstream generator.
+  - name: Ask for help
+    url: https://github.com/EIGSEP/eigsep-field/discussions
+    about: Questions and general discussion about field deployment.

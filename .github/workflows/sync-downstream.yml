@@ -1,0 +1,91 @@
+name: sync-downstream
+
+# Fire when a release is published. Files an informational issue in each
+# sibling repo pointing at the new eigsep-field tag and the version it
+# pinned that sibling to.
+#
+# Auth: uses a GitHub App (scoped to the EIGSEP org) whose credentials
+# are in secrets.EIGSEP_FIELD_APP_ID + secrets.EIGSEP_FIELD_APP_PRIVATE_KEY.
+# The App must be installed on every sibling repo listed in repo_map below,
+# with Issues:write permission. See docs in the repo README / CLAUDE.md
+# for setup instructions. Workflow no-ops if the secrets aren't configured.
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Guard — require App credentials
+        id: guard
+        env:
+          APP_ID: ${{ secrets.EIGSEP_FIELD_APP_ID }}
+          APP_KEY: ${{ secrets.EIGSEP_FIELD_APP_PRIVATE_KEY }}
+        run: |
+          if [[ -z "$APP_ID" || -z "$APP_KEY" ]]; then
+              echo "App secrets not configured; skipping" >&2
+              echo "go=false" >> "$GITHUB_OUTPUT"
+          else
+              echo "go=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Mint App installation token
+        if: steps.guard.outputs.go == 'true'
+        id: app_token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.EIGSEP_FIELD_APP_ID }}
+          private-key: ${{ secrets.EIGSEP_FIELD_APP_PRIVATE_KEY }}
+          owner: EIGSEP
+          repositories: |
+            eigsep_redis
+            pico-firmware
+            cmt_vna
+            eigsep_observing
+            pyvalon
+
+      - uses: actions/checkout@v6
+        if: steps.guard.outputs.go == 'true'
+
+      - uses: actions/setup-python@v6
+        if: steps.guard.outputs.go == 'true'
+        with:
+          python-version: "3.11"
+
+      - name: File informational issue in each sibling repo
+        if: steps.guard.outputs.go == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app_token.outputs.token }}
+        run: |
+          python3 - <<'EOF'
+          import os, subprocess, tomllib
+          m = tomllib.load(open("manifest.toml", "rb"))
+          release = m["release"]
+          tag = os.environ["GITHUB_REF"].removeprefix("refs/tags/")
+          url = f"https://github.com/EIGSEP/eigsep-field/releases/tag/{tag}"
+
+          repo_map = {
+              "eigsep_redis": "eigsep_redis",
+              "pico-firmware": "picohost",
+              "cmt_vna": "eigsep-vna",
+              "eigsep_observing": "eigsep_observing",
+              "pyvalon": "pyvalon",
+          }
+          for repo, pkg in repo_map.items():
+              version = m["packages"][pkg]["version"]
+              title = f"eigsep-field {release}: your package pinned at {version}"
+              body = (
+                  f"eigsep-field {release} was released at {url}.\n\n"
+                  f"This release pins `{pkg}=={version}` in the field stack.\n"
+                  f"No action required unless you see producer-contract drift."
+              )
+              subprocess.run([
+                  "gh", "issue", "create",
+                  "--repo", f"EIGSEP/{repo}",
+                  "--title", title,
+                  "--body", body,
+                  "--label", "eigsep-field-release",
+              ], check=True)
+          EOF

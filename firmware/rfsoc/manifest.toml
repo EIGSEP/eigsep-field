@@ -1,0 +1,12 @@
+# Per-firmware local manifest. Mirrors the [firmware.rfsoc_bitstream]
+# table in the top-level manifest.toml.
+
+version = "2026-04-01"
+asset   = "eigsep_vivaldi_2026-04-01.npz"
+source  = "https://github.com/EIGSEP/eigsep_dac"
+commit  = ""
+sha256  = ""
+
+# Notes:
+#   loader.py in this directory is VENDORED from eigsep_dac at the
+#   pinned commit. Re-vendor when bumping.

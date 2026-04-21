@@ -1,0 +1,10 @@
+IMG_NAME="eigsep-field"
+TARGET_HOSTNAME="eigsep"
+RELEASE="bookworm"
+DEPLOY_COMPRESSION=xz
+ENABLE_SSH=1
+FIRST_USER_NAME="eigsep"
+# FIRST_USER_PASS is deliberately not set — pi-gen will use the default
+# "raspberry" unless overridden in a local .env. Change this before
+# any production deploy.
+STAGE_LIST="stage0 stage1 stage2 stage-eigsep"

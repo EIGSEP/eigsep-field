@@ -1,0 +1,51 @@
+name: coordinated-pr-check (reusable)
+
+# Drop a thin caller into each sibling repo's .github/workflows/:
+#
+#   name: coordinated-pr-check
+#   on: pull_request
+#   jobs:
+#     check:
+#       uses: EIGSEP/eigsep-field/.github/workflows/coordinated-pr-check.reusable.yml@main
+#
+# Fails the PR if it is labelled 'coordinated-change' and the referenced
+# eigsep-field issue is not yet closed (prevents half-merges).
+
+on:
+  workflow_call:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Skip if not a coordinated PR
+        id: gate
+        run: |
+          if echo '${{ toJson(github.event.pull_request.labels) }}' | grep -q '"coordinated-change"'; then
+              echo "gate=go" >> "$GITHUB_OUTPUT"
+          else
+              echo "gate=skip" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Extract eigsep-field issue number
+        if: steps.gate.outputs.gate == 'go'
+        id: issue
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+        run: |
+          num=$(echo "$BODY" | grep -oE 'EIGSEP/eigsep-field#[0-9]+' | head -1 | grep -oE '[0-9]+$' || true)
+          if [[ -z "$num" ]]; then
+              echo "PR lacks 'Refs: EIGSEP/eigsep-field#<n>' footer" >&2
+              exit 1
+          fi
+          echo "num=$num" >> "$GITHUB_OUTPUT"
+      - name: Verify parent issue exists
+        if: steps.gate.outputs.gate == 'go'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "/repos/EIGSEP/eigsep-field/issues/${{ steps.issue.outputs.num }}" \
+              --jq '.state' > /tmp/state
+          cat /tmp/state
+          # We do not require the parent to be closed — that would be a
+          # chicken-and-egg. We only require it to exist (not 404). Merge
+          # ordering is enforced by reviewer discipline.

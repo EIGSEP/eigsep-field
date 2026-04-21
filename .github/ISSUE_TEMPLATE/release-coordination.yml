@@ -1,0 +1,37 @@
+name: Release coordination
+description: Cut a new blessed stack release.
+title: "[release] "
+labels: [release]
+body:
+  - type: input
+    id: release
+    attributes:
+      label: Target release (calver)
+      placeholder: "2026.05.0"
+    validations: { required: true }
+  - type: textarea
+    id: changes
+    attributes:
+      label: Package version changes
+      description: For each sibling, old → new. Leave unchanged ones out.
+      placeholder: |
+        eigsep_redis: 2.1.0 → 2.2.0
+        picohost: 3.0.0 → 3.0.1
+    validations: { required: true }
+  - type: textarea
+    id: firmware
+    attributes:
+      label: Firmware changes
+      description: Pico .uf2 and/or RFSoC bitstream bumps.
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Release checklist
+      options:
+        - label: Updated `manifest.toml` (versions, tags, released_at)
+        - label: Wrote `docs/releases/<release>.md`
+        - label: Ran `./scripts/refresh-lock.sh`
+        - label: CI green on PR (lint, manifest, lock-drift, smoke, contract)
+        - label: Tag pushed and `wheelhouse.yml` + `image.yml` succeeded
+        - label: Image verified in qemu / on a test Pi
+        - label: `sync-downstream.yml` notifications filed in siblings

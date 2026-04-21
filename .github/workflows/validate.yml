@@ -1,0 +1,134 @@
+name: validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - run: python -m pip install ruff
+      - run: ruff check .
+      - run: ruff format --check .
+
+  manifest:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Verify manifest versions exist upstream
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/verify_manifest.py manifest.toml
+
+  lock-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - uses: astral-sh/setup-uv@v4
+      - name: uv lock must be in sync
+        run: uv lock --locked
+      - name: requirements.txt must match uv export
+        run: |
+          uv export --format requirements-txt --no-hashes \
+              --output-file /tmp/req.txt
+          diff -u requirements.txt /tmp/req.txt
+
+  smoke:
+    runs-on: ubuntu-latest
+    needs: [manifest]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Install from source (pulls blessed deps from PyPI)
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install .
+      - name: Import every blessed package
+        run: |
+          python -c "import eigsep_redis, picohost, eigsep_observing, pyvalon; print('imports ok')"
+          python -c "import cmt_vna" || python -c "import eigsep_vna" || true
+      - name: CLI info
+        run: eigsep-field info
+
+  contract:
+    # Install the blessed eigsep_observing at its manifest tag and run
+    # producer-contract tests against the pinned stack.
+    runs-on: ubuntu-latest
+    needs: [manifest]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Read manifest
+        id: m
+        run: |
+          python3 - <<'EOF' >> "$GITHUB_OUTPUT"
+          import tomllib
+          m = tomllib.load(open("manifest.toml", "rb"))
+          print(f"obs_version={m['packages']['eigsep_observing']['version']}")
+          print(f"obs_tag={m['packages']['eigsep_observing']['tag']}")
+          EOF
+      - name: Clone eigsep_observing at blessed tag
+        run: |
+          git clone --depth=1 --branch "${{ steps.m.outputs.obs_tag }}" \
+              https://github.com/EIGSEP/eigsep_observing /tmp/obs
+      - name: Install stack pinned to manifest
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install .
+          python -m pip install "eigsep_observing==${{ steps.m.outputs.obs_version }}[dev]"
+      - name: Run producer contract tests
+        working-directory: /tmp/obs
+        run: pytest -q tests/test_producer_contracts.py tests/test_key_uniqueness.py
+
+  docs-drift:
+    # Interface docs (docs/interface/*.md) carry generated tables derived
+    # from eigsep_redis.keys, eigsep_observing.keys, and
+    # eigsep_observing.io.SENSOR_SCHEMAS. This job installs the blessed
+    # sibling versions, regenerates, and fails if anything drifted.
+    runs-on: ubuntu-latest
+    needs: [manifest]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Read manifest
+        id: m
+        run: |
+          python3 - <<'EOF' >> "$GITHUB_OUTPUT"
+          import tomllib
+          m = tomllib.load(open("manifest.toml", "rb"))
+          print(f"redis_version={m['packages']['eigsep_redis']['version']}")
+          print(f"obs_version={m['packages']['eigsep_observing']['version']}")
+          EOF
+      - name: Install blessed sibling versions + test deps
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install .[dev]
+          python -m pip install \
+              "eigsep_redis==${{ steps.m.outputs.redis_version }}" \
+              "eigsep_observing==${{ steps.m.outputs.obs_version }}[dev]"
+      - name: Regenerate interface docs
+        run: python3 scripts/gen_interface_docs.py
+      - name: Fail if docs drifted
+        run: git diff --exit-code docs/interface/
+      - name: pytest interface drift test (belt and suspenders)
+        run: pytest -q tests/test_interface_docs.py

@@ -1,0 +1,69 @@
+[build-system]
+requires = ["hatchling>=1.21"]
+build-backend = "hatchling.build"
+
+[project]
+name = "eigsep-field"
+description = "EIGSEP field stack — blessed package set per release"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Christian Hellum Bye", email = "cbh@berkeley.edu" }]
+classifiers = [
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering :: Astronomy",
+]
+dynamic = ["version", "dependencies"]
+
+[project.optional-dependencies]
+dev = [
+  "ruff",
+  "pytest",
+  "pytest-cov",
+  "pytest-timeout",
+  "build",
+]
+
+[project.scripts]
+eigsep-field = "eigsep_field.cli:main"
+
+[project.urls]
+Repository = "https://github.com/EIGSEP/eigsep-field"
+Issues = "https://github.com/EIGSEP/eigsep-field/issues"
+
+[tool.hatch.metadata.hooks.custom]
+path = "scripts/hatch_manifest_hook.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/eigsep_field"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"manifest.toml" = "eigsep_field/_manifest.toml"
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "src/eigsep_field",
+  "manifest.toml",
+  "pyproject.toml",
+  "README.md",
+  "LICENSE",
+  "scripts/hatch_manifest_hook.py",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = ["--timeout=60"]
+
+[tool.ruff]
+line-length = 79
+
+[tool.ruff.lint]
+extend-ignore = ["E203"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/*/__init__.py" = ["F401"]
+"scripts/*.py" = ["E402"]
