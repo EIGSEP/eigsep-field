@@ -50,6 +50,20 @@ tag     = "v0.1.0"
 source  = "https://github.com/EIGSEP/pyvalon"
 sha256  = ""
 
+# ---- Hardware-only Python packages (not on PyPI; built from git, shipped
+# as pre-built aarch64 wheels in the wheelhouse). Installed out-of-band on
+# Pi nodes via hardware-requirements.txt; NOT a dep of the eigsep-field
+# meta package, because the ground stack lazy-imports them and non-Pi
+# installs (CI, dev) should not pull them from git. ----
+
+[hardware.casperfpga]
+# SNAP board driver (CASPER collaboration). Our fork adds the I2C helpers
+# needed for EIGSEP. eigsep_observing lazy-imports it (fpga.py, blocks.py)
+# so only the ground computer requires it at runtime.
+version = "0.6.0"
+tag     = "v0.6.0"
+source  = "https://github.com/EIGSEP/casperfpga"
+
 # ---- Firmware artifacts (not pip-installable; checksummed blobs) ----
 
 [firmware.pico]

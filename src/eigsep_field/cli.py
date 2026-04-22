@@ -46,6 +46,21 @@ def _cmd_info(_: argparse.Namespace) -> int:
         if status != "ok":
             any_drift = True
         print(f"{name:<24} {blessed:<12} {installed:<12} {status}")
+
+    # Hardware-only packages (e.g. casperfpga). Not installed on CI/dev —
+    # MISSING is informational here; only DRIFT fails.
+    for name, entry in manifest.get("hardware", {}).items():
+        blessed = entry["version"]
+        try:
+            installed = version(name)
+        except PackageNotFoundError:
+            installed = "(not installed)"
+            status = "hw-only"
+        else:
+            status = "ok" if _versions_equal(installed, blessed) else "DRIFT"
+            if status == "DRIFT":
+                any_drift = True
+        print(f"{name:<24} {blessed:<12} {installed:<12} {status}")
     return 1 if any_drift else 0
 
 
@@ -134,6 +149,25 @@ def _cmd_doctor(_: argparse.Namespace) -> int:
             )
         else:
             ok.append(f"{name}: {installed}")
+
+    # hardware-only packages (e.g. casperfpga): required on Pi nodes.
+    # doctor is Pi-oriented (it also pokes redis-server), so treat
+    # missing as a problem here.
+    for name, entry in manifest.get("hardware", {}).items():
+        blessed = entry["version"]
+        try:
+            installed = version(name)
+        except PackageNotFoundError:
+            problems.append(
+                f"{name}: not installed (hardware, blessed {blessed})"
+            )
+            continue
+        if not _versions_equal(installed, blessed):
+            problems.append(
+                f"{name}: installed {installed}, blessed {blessed}"
+            )
+        else:
+            ok.append(f"{name}: {installed} (hardware)")
 
     for line in ok:
         print(f"  ok   {line}")

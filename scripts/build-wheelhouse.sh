@@ -48,7 +48,13 @@ uv pip download \
     --dest "$OUT" \
     -r "$OUT/requirements.txt"
 
-# 3. Sanity-check the wheelhouse contains every EIGSEP package at the
+# 3. Build off-PyPI hardware wheels (e.g. casperfpga) for the target arch
+#    and emit a hashed hardware-requirements.txt alongside requirements.txt.
+#    install-field.sh consumes both.
+./scripts/build-git-wheels.sh "$MANIFEST" "$OUT" "$PLATFORM"
+python3 scripts/hardware_requirements.py "$MANIFEST" "$OUT"
+
+# 4. Sanity-check the wheelhouse contains every EIGSEP package at the
 #    manifest-blessed version (catches sdist-only edge cases).
 python3 scripts/check_wheelhouse.py "$MANIFEST" "$OUT"
 

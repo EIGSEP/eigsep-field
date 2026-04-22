@@ -55,6 +55,12 @@ def main(argv: list[str]) -> int:
         if not pypi_has(name, version):
             errors.append(f"PyPI missing: {name}=={version}")
 
+    for key, entry in manifest.get("hardware", {}).items():
+        if not gh_has_tag(entry["source"], entry["tag"]):
+            errors.append(
+                f"GH tag missing: {entry['source']} @ {entry['tag']}"
+            )
+
     for key, entry in manifest.get("firmware", {}).items():
         if entry.get("tag"):
             if not gh_has_tag(entry["source"], entry["tag"]):
@@ -73,8 +79,11 @@ def main(argv: list[str]) -> int:
             print(f"  - {e}", file=sys.stderr)
         return 1
 
+    n_hw = len(manifest.get("hardware", {}))
+    hw_tail = f" + {n_hw} hardware tag(s)" if n_hw else ""
     print(
         f"manifest OK: {len(manifest['packages'])} packages verified on PyPI"
+        f"{hw_tail}"
     )
     return 0
 

@@ -25,13 +25,22 @@ def main(argv: list[str]) -> int:
         if not matches:
             missing.append(f"{name}=={version}")
 
+    for name, entry in manifest.get("hardware", {}).items():
+        version = entry["version"]
+        matches = list(wheel_dir.glob(f"{name}-{version}-*.whl"))
+        if not matches:
+            missing.append(f"{name}=={version} (hardware)")
+
     if missing:
         print("missing from wheelhouse:", file=sys.stderr)
         for m in missing:
             print(f"  - {m}", file=sys.stderr)
         return 1
+    n_hw = len(manifest.get("hardware", {}))
+    hw_tail = f" + {n_hw} hardware" if n_hw else ""
     print(
         f"wheelhouse OK: {len(manifest['packages'])} EIGSEP packages present"
+        f"{hw_tail}"
     )
     return 0
 

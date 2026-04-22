@@ -56,6 +56,28 @@ from `manifest.toml`. Change `manifest.toml`, then run
 4. If it ships a contract surface, add a permalink entry in
    `docs/interface/README.md`.
 
+## When adding a hardware-only (off-PyPI) package
+
+`[hardware.*]` entries describe Python packages that aren't on PyPI and
+are only needed on Pi nodes that talk to real hardware. `casperfpga` is
+the current example. They are **not** dependencies of the `eigsep-field`
+meta package — ground stack code lazy-imports them — so CI/dev installs
+never fetch them. On the Pi, `install-field.sh` installs them from
+pre-built aarch64 wheels staged in the wheelhouse.
+
+To add one:
+
+1. Add `[hardware.<name>]` to `manifest.toml` with `version`, `tag`, and
+   `source` (git URL of the EIGSEP fork).
+2. `./scripts/build-wheelhouse.sh` will cross-build an aarch64 wheel via
+   docker + qemu (`scripts/build-git-wheels.sh`) and emit
+   `wheels/hardware-requirements.txt` with sha256 hashes.
+3. `eigsep-field info`/`doctor` pick it up automatically via the
+   `manifest["hardware"]` table.
+4. Building requires docker + binfmt-registered qemu-user-static on the
+   dev machine running the wheelhouse build. (Native builds are used
+   when the host is already the target arch.)
+
 ## When a sibling edits a contract surface (keys, SENSOR_SCHEMAS)
 
 Interface docs (`docs/interface/redis-keys.md`, `sensor-schemas.md`) carry

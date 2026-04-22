@@ -38,6 +38,16 @@ fi
     -r "$WHEELS/requirements.txt" \
     eigsep-field
 
+# Hardware-only Python packages (e.g. casperfpga): installed from
+# pre-built aarch64 wheels in the wheelhouse. Declared in manifest.toml
+# [hardware.*]. Pi-only; CI/dev environments don't apply this step.
+if [[ -f "$WHEELS/hardware-requirements.txt" ]]; then
+    "$PIP" install --no-index \
+        --find-links "$WHEELS" \
+        --require-hashes \
+        -r "$WHEELS/hardware-requirements.txt"
+fi
+
 "$VENV/bin/eigsep-field" info
 echo
 echo "install complete. run 'eigsep-field verify' to exercise producer contracts."
