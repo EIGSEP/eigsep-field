@@ -27,8 +27,10 @@ authoritative source.
 - **Sensor schemas** — `SENSOR_SCHEMAS` in
   `eigsep_observing/src/eigsep_observing/io.py`. Schemas are load-bearing
   for averaging reduction (`_avg_sensor_values`).
-- **Producer contracts** — `eigsep_observing/tests/test_producer_contracts.py`.
-  `eigsep-field verify` invokes these; don't duplicate them here.
+- **Producer contracts** — `eigsep_observing/src/eigsep_observing/contract_tests/`
+  (shipped inside the wheel so `eigsep-field verify` can run them via
+  `pytest --pyargs eigsep_observing.contract_tests` on wheel-only installs).
+  Don't duplicate them here.
 - **Architecture prose** — `eigsep_observing/CLAUDE.md` and
   `eigsep_redis/CLAUDE.md` are authoritative.
 

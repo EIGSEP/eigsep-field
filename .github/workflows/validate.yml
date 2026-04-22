@@ -95,8 +95,9 @@ jobs:
           python -m pip install .
           python -m pip install "eigsep_observing==${{ steps.m.outputs.obs_version }}[dev]"
       - name: Run producer contract tests
-        working-directory: /tmp/obs
-        run: pytest -q tests/test_producer_contracts.py tests/test_key_uniqueness.py
+        run: |
+          pytest -q --pyargs eigsep_observing.contract_tests
+          pytest -q /tmp/obs/tests/test_key_uniqueness.py
 
   docs-drift:
     # Interface docs (docs/interface/*.md) carry generated tables derived

@@ -1,11 +1,16 @@
 # Producer contract tests
 
 Every producer (Pico apps via `picohost`, VNA via `cmt_vna`, SNAP via
-`eigsep_observing.fpga`) is validated against `SENSOR_SCHEMAS` by
-[`eigsep_observing/tests/test_producer_contracts.py`](https://github.com/EIGSEP/eigsep_observing/blob/v1.0.0/tests/test_producer_contracts.py).
+`eigsep_observing.fpga`) is validated against `SENSOR_SCHEMAS` by the
+producer-contract suite shipped at
+[`eigsep_observing/src/eigsep_observing/contract_tests/`](https://github.com/EIGSEP/eigsep_observing/tree/main/src/eigsep_observing/contract_tests).
+The suite lives under `src/` so it installs with the wheel and is reachable
+via `pytest --pyargs` on wheel-only hosts (e.g. the Pi).
 
 Cross-package key uniqueness is enforced by
 [`eigsep_observing/tests/test_key_uniqueness.py`](https://github.com/EIGSEP/eigsep_observing/blob/v1.0.0/tests/test_key_uniqueness.py).
+(Still in `tests/` — not needed by `eigsep-field verify`; runs in
+CI against a cloned eigsep_observing checkout.)
 
 ## Run them
 
@@ -18,14 +23,8 @@ eigsep-field verify
 Or directly:
 
 ```bash
-pytest --pyargs eigsep_observing.tests.test_producer_contracts
-pytest --pyargs eigsep_observing.tests.test_key_uniqueness
+pytest --pyargs eigsep_observing.contract_tests
 ```
-
-The `--pyargs` form works once `eigsep_observing` ships its `tests/` dir as
-installed package data (tracked upstream). Until then, `eigsep-field verify`
-falls back to cloning the repo at the manifest tag and invoking `pytest`
-against it.
 
 ## If the contract test fails
 

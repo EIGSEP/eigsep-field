@@ -50,7 +50,12 @@ def _cmd_info(_: argparse.Namespace) -> int:
 
 
 def _cmd_verify(_: argparse.Namespace) -> int:
-    """Run eigsep_observing's producer-contract tests if available."""
+    """Run eigsep_observing's producer-contract tests if available.
+
+    The suite ships inside the eigsep_observing wheel (under
+    ``eigsep_observing.contract_tests``) so this works on wheel-only
+    installs — no test-tree checkout required.
+    """
     try:
         import eigsep_observing  # noqa: F401
     except ImportError:
@@ -66,33 +71,9 @@ def _cmd_verify(_: argparse.Namespace) -> int:
         "-q",
         "--no-header",
         "--pyargs",
-        "eigsep_observing.tests.test_producer_contracts",
+        "eigsep_observing.contract_tests",
     ]
-    r = subprocess.run(cmd)
-    if r.returncode != 0:
-        cmd_fallback = [
-            sys.executable,
-            "-m",
-            "pytest",
-            "-q",
-            "--no-header",
-            str(_find_observing_tests() / "test_producer_contracts.py"),
-        ]
-        r = subprocess.run(cmd_fallback)
-    return r.returncode
-
-
-def _find_observing_tests() -> Path:
-    import eigsep_observing
-
-    pkg_root = Path(eigsep_observing.__file__).resolve().parent.parent.parent
-    tests = pkg_root / "tests"
-    if tests.exists():
-        return tests
-    raise FileNotFoundError(
-        "could not locate eigsep_observing tests; clone the repo "
-        "at its manifest tag for `eigsep-field verify`"
-    )
+    return subprocess.run(cmd).returncode
 
 
 def _sha256(path: Path) -> str:
