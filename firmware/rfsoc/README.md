@@ -4,26 +4,42 @@ RFSoC bitstream artifact. The `.npz` itself is not committed — it's in
 GitHub Releases. This directory carries:
 
 - `manifest.toml` — version (date), asset filename, source commit, sha256
-- `loader.py` — **vendored** from `eigsep_dac` at the pinned commit. The
-  vendor insulates the field from `eigsep_dac`'s ongoing development
-  churn; when we bump the bitstream, we re-vendor this file from the same
-  commit.
 
-## Why vendor rather than depend
+The host programmer code (previously vendored here as `loader.py`) now
+lives in the installable `eigsep_dac` package, pinned in the top-level
+`manifest.toml` under `[hardware.eigsep_dac]`. Its tag must match the
+`commit` pinned in `[firmware.rfsoc_bitstream]` — the bitstream and the
+programmer are produced together.
 
-`eigsep_dac` is a mixed analysis + code repo without a release cadence or
-stable API. We only need the `.npz` loader script, not the notebooks and
-analysis scaffolding. Pinning by commit SHA + vendoring `loader.py` gives
-us deterministic behavior without taking a dependency on an unstable
-package.
+## Where the programmer runs
 
-When `eigsep_dac` eventually carves out a stable `eigsep_dac.bitstream`
-subpackage with a published API, promote it from vendor to dep and delete
-this loader.
+`eigsep_dac` is a **hardware** package — not a runtime dep of the
+`eigsep-field` meta wheel. It runs on the RFSoC, not the Pi. The
+wheelhouse carries its wheel so a field operator can rsync it to the
+RFSoC without internet:
+
+```bash
+# On the Pi (or anywhere with the wheelhouse)
+scp /opt/eigsep/wheels/eigsep_dac-*.whl rfsoc:/tmp/
+scp /opt/eigsep/wheels/casperfpga-*.whl rfsoc:/tmp/
+scp /opt/eigsep/firmware/rfsoc/*.npz rfsoc:/opt/eigsep/firmware/rfsoc/
+
+# On the RFSoC
+pip install --no-index --find-links /tmp /tmp/eigsep_dac-*.whl
+```
 
 ## Flash
 
+After the wheel is installed on the RFSoC, the `eigsep-dac-program`
+console script loads a bitstream npz:
+
 ```bash
-python3 /opt/eigsep/firmware/rfsoc/loader.py \
-    /opt/eigsep/firmware/rfsoc/<asset>.npz
+eigsep-dac-program --ip <board> \
+    --npz /opt/eigsep/firmware/rfsoc/<asset>.npz
 ```
+
+The RFSoC's boot systemd unit invokes the same entry point (via
+`rfsocdac.py` in eigsep_dac, which forwards to
+`eigsep_dac.program_board.main`). Hot-fixing in the field means rsync
+a newer wheel to the RFSoC and `pip install --upgrade`; no re-image
+required.

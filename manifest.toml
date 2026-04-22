@@ -52,9 +52,11 @@ sha256  = ""
 
 # ---- Hardware-only Python packages (not on PyPI; built from git, shipped
 # as pre-built aarch64 wheels in the wheelhouse). Installed out-of-band on
-# Pi nodes via hardware-requirements.txt; NOT a dep of the eigsep-field
-# meta package, because the ground stack lazy-imports them and non-Pi
-# installs (CI, dev) should not pull them from git. ----
+# field nodes — the Pi (casperfpga, via install-field.sh) and the RFSoC
+# (eigsep_dac, rsync'd from the Pi's wheelhouse by the operator). NOT a
+# dep of the eigsep-field meta package, because the ground stack either
+# lazy-imports them (casperfpga) or doesn't import them at all
+# (eigsep_dac); CI/dev installs should not pull them from git. ----
 
 [hardware.casperfpga]
 # SNAP board driver (CASPER collaboration). Our fork adds the I2C helpers
@@ -63,6 +65,22 @@ sha256  = ""
 version = "0.6.0"
 tag     = "v0.6.0"
 source  = "https://github.com/EIGSEP/casperfpga"
+
+[hardware.eigsep_dac]
+# RFSoC2x2 DAC programmer + pseudorandom waveform helpers. Runs on the
+# RFSoC itself (aarch64, same wheel arch as the Pi) — not on the Pi's
+# ground stack. The wheel is staged in the wheelhouse so a field operator
+# can rsync it from the Pi to the RFSoC for install or hot-fix without
+# internet. Must track the commit pinned in [firmware.rfsoc_bitstream];
+# the host programmer code and the .npz are produced together.
+#
+# TODO: fill tag + sha256 once the eigsep_dac refactor PR merges and
+# tags its first release (tracking EIGSEP/eigsep_dac#1). Until then this
+# entry is a placeholder and `./scripts/refresh-lock.sh` will not be able
+# to resolve it.
+version = "0.1.0"
+tag     = ""
+source  = "https://github.com/EIGSEP/eigsep_dac"
 
 # ---- Firmware artifacts (not pip-installable; checksummed blobs) ----
 
@@ -75,9 +93,10 @@ tag     = "v3.0.0"
 sha256  = ""
 
 [firmware.rfsoc_bitstream]
-# Produced by a script in eigsep_dac; flashed to the RFSoC. eigsep_dac is
-# not release-managed, so we pin by commit SHA. loader.py is vendored at
-# this commit into firmware/rfsoc/loader.py.
+# Produced by a script in eigsep_dac; flashed to the RFSoC. The commit
+# pinned here must match the tag in [hardware.eigsep_dac] — the host
+# programmer code (the wheel) and the bitstream are produced together,
+# and the programmer assumes the bitstream's npz schema.
 version = "2026-04-01"
 asset   = "eigsep_vivaldi_2026-04-01.npz"
 source  = "https://github.com/EIGSEP/eigsep_dac"

@@ -31,6 +31,7 @@ body:
         - label: Updated `manifest.toml` (versions, tags, released_at)
         - label: Wrote `docs/releases/<release>.md`
         - label: Ran `./scripts/refresh-lock.sh`
+        - label: '`[hardware.eigsep_dac].tag` matches `[firmware.rfsoc_bitstream].commit` (bitstream + host programmer must be paired)'
         - label: CI green on PR (lint, manifest, lock-drift, smoke, contract)
         - label: Tag pushed and `wheelhouse.yml` + `image.yml` succeeded
         - label: Image verified in qemu / on a test Pi

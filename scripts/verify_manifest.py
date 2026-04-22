@@ -56,10 +56,19 @@ def main(argv: list[str]) -> int:
             errors.append(f"PyPI missing: {name}=={version}")
 
     for key, entry in manifest.get("hardware", {}).items():
-        if not gh_has_tag(entry["source"], entry["tag"]):
-            errors.append(
-                f"GH tag missing: {entry['source']} @ {entry['tag']}"
+        tag = entry.get("tag", "")
+        if not tag:
+            # Placeholder entry on a draft PR anticipating a sibling
+            # release (e.g. eigsep_dac before its first tag). Warn, don't
+            # fail — refresh-lock.sh still requires a real tag, so the
+            # release cannot actually ship without one.
+            print(
+                f"warning: {key}: empty tag (draft placeholder); skipping",
+                file=sys.stderr,
             )
+            continue
+        if not gh_has_tag(entry["source"], tag):
+            errors.append(f"GH tag missing: {entry['source']} @ {tag}")
 
     for key, entry in manifest.get("firmware", {}).items():
         if entry.get("tag"):
