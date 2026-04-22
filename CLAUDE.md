@@ -21,7 +21,9 @@ authoritative source.
 
 - **Key registry** — `eigsep_redis/src/eigsep_redis/keys.py` plus
   `eigsep_observing/src/eigsep_observing/keys.py`. Cross-package uniqueness
-  is tested by `eigsep_observing/tests/test_key_uniqueness.py`.
+  is tested by
+  `eigsep_observing/src/eigsep_observing/contract_tests/test_key_uniqueness.py`
+  (shipped inside the wheel alongside the producer-contract suite).
 - **Bus surfaces** — `eigsep_redis/src/eigsep_redis/{metadata,status,heartbeat,config}.py`.
   Writer/reader-per-bus is structural: wrong-bus writes are impossible.
 - **Sensor schemas** — `SENSOR_SCHEMAS` in

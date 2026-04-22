@@ -14,7 +14,7 @@ a git SHA (not `main`) so they stay stable as the repos evolve.
 | [Redis key registry](redis-keys.md)          | `eigsep_redis/src/eigsep_redis/keys.py` + `eigsep_observing/src/eigsep_observing/keys.py`         |
 | [Sensor schemas](sensor-schemas.md)          | `SENSOR_SCHEMAS` in `eigsep_observing/src/eigsep_observing/io.py`                                 |
 | [Bus roles](bus-roles.md)                    | Writer/reader-per-bus pattern; see `eigsep_redis/CLAUDE.md`                                       |
-| [Producer contracts](producer-contracts.md)  | `eigsep_observing/src/eigsep_observing/contract_tests/` + `tests/test_key_uniqueness.py`          |
+| [Producer contracts](producer-contracts.md)  | `eigsep_observing/src/eigsep_observing/contract_tests/` (producer conformance + key uniqueness)   |
 
 ## Structure of each doc
 
