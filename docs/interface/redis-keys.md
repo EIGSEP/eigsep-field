@@ -8,7 +8,8 @@ as a module-level string constant in one of two authoritative modules:
 - **`eigsep_observing.keys`** — observer-side keys (corr streams, VNA stream).
 
 Cross-package uniqueness is enforced at test time by
-`eigsep_observing/tests/test_key_uniqueness.py`.
+`eigsep_observing/src/eigsep_observing/contract_tests/test_key_uniqueness.py`
+(ships inside the wheel; runs on every `eigsep-field verify`).
 
 ## Naming convention
 

@@ -67,8 +67,10 @@ jobs:
         run: eigsep-field info
 
   contract:
-    # Install the blessed eigsep_observing at its manifest tag and run
-    # producer-contract tests against the pinned stack.
+    # Install the blessed eigsep_observing at its manifest version and run
+    # its shipped contract-test suite against the pinned stack. No repo
+    # clone needed: the suite lives inside the wheel at
+    # eigsep_observing.contract_tests.
     runs-on: ubuntu-latest
     needs: [manifest]
     steps:
@@ -83,21 +85,14 @@ jobs:
           import tomllib
           m = tomllib.load(open("manifest.toml", "rb"))
           print(f"obs_version={m['packages']['eigsep_observing']['version']}")
-          print(f"obs_tag={m['packages']['eigsep_observing']['tag']}")
           EOF
-      - name: Clone eigsep_observing at blessed tag
-        run: |
-          git clone --depth=1 --branch "${{ steps.m.outputs.obs_tag }}" \
-              https://github.com/EIGSEP/eigsep_observing /tmp/obs
       - name: Install stack pinned to manifest
         run: |
           python -m pip install --upgrade pip
           python -m pip install .
           python -m pip install "eigsep_observing==${{ steps.m.outputs.obs_version }}[dev]"
-      - name: Run producer contract tests
-        run: |
-          pytest -q --pyargs eigsep_observing.contract_tests
-          pytest -q /tmp/obs/tests/test_key_uniqueness.py
+      - name: Run contract tests
+        run: pytest -q --pyargs eigsep_observing.contract_tests
 
   docs-drift:
     # Interface docs (docs/interface/*.md) carry generated tables derived
