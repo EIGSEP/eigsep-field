@@ -17,6 +17,12 @@ def main(argv: list[str]) -> int:
     manifest = tomllib.loads(manifest_path.read_text())
 
     missing: list[str] = []
+
+    meta_version = manifest["release"]
+    meta_matches = list(wheel_dir.glob(f"eigsep_field-{meta_version}-*.whl"))
+    if not meta_matches:
+        missing.append(f"eigsep-field=={meta_version} (meta)")
+
     for entry in manifest["packages"].values():
         name = entry["pypi"].replace("-", "_")
         version = entry["version"]

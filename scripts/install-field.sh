@@ -32,11 +32,13 @@ if [[ ! -x "$PIP" ]]; then
     python3 -m venv "$VENV"
 fi
 
+# requirements.txt pins both the transitive deps (emitted by uv pip
+# compile) and the eigsep-field meta wheel itself (appended by
+# build-wheelhouse.sh), so this single step installs everything.
 "$PIP" install --no-index \
     --find-links "$WHEELS" \
     --require-hashes \
-    -r "$WHEELS/requirements.txt" \
-    eigsep-field
+    -r "$WHEELS/requirements.txt"
 
 # Hardware-only Python packages (e.g. casperfpga): installed from
 # pre-built aarch64 wheels in the wheelhouse. Declared in manifest.toml

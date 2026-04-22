@@ -54,7 +54,33 @@ uv pip download \
 ./scripts/build-git-wheels.sh "$MANIFEST" "$OUT" "$PLATFORM"
 python3 scripts/hardware_requirements.py "$MANIFEST" "$OUT"
 
-# 4. Sanity-check the wheelhouse contains every EIGSEP package at the
+# 4. Build the eigsep-field meta wheel itself into the wheelhouse, then
+#    append its pin + sha256 to requirements.txt so install-field.sh can
+#    install it offline under --require-hashes. Pure-Python, so a single
+#    wheel works on any platform.
+uv build --wheel --out-dir "$OUT"
+python3 - "$MANIFEST" "$OUT" <<'PY'
+import hashlib, sys, tomllib
+from pathlib import Path
+manifest_path, out_dir = Path(sys.argv[1]), Path(sys.argv[2])
+version = tomllib.loads(manifest_path.read_text())["release"]
+wheels = sorted(out_dir.glob(f"eigsep_field-{version}-*.whl"))
+if len(wheels) != 1:
+    sys.exit(
+        f"expected 1 eigsep_field wheel at {version}, got "
+        f"{[w.name for w in wheels]}"
+    )
+h = hashlib.sha256()
+with wheels[0].open("rb") as f:
+    for chunk in iter(lambda: f.read(1 << 20), b""):
+        h.update(chunk)
+req = out_dir / "requirements.txt"
+with req.open("a") as f:
+    f.write(f"\neigsep-field=={version} \\\n    --hash=sha256:{h.hexdigest()}\n")
+print(f"appended eigsep-field=={version} to {req}")
+PY
+
+# 5. Sanity-check the wheelhouse contains every EIGSEP package at the
 #    manifest-blessed version (catches sdist-only edge cases).
 python3 scripts/check_wheelhouse.py "$MANIFEST" "$OUT"
 
