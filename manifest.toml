@@ -63,9 +63,12 @@ sha256  = ""
 
 # ---- Hardware-only Python packages (not on PyPI; built from git, shipped
 # as pre-built aarch64 wheels in the wheelhouse). Installed out-of-band on
-# Pi nodes via hardware-requirements.txt; NOT a dep of the eigsep-field
-# meta package, because the ground stack lazy-imports them and non-Pi
-# installs (CI, dev) should not pull them from git. ----
+# field nodes: Pi-side entries via hardware-requirements.txt in the image
+# chroot; the RFSoC-side eigsep_dac wheel is staged in the wheelhouse for
+# the operator to push to the board. NOT a dep of the eigsep-field meta
+# package, because the ground stack lazy-imports them (or, for
+# eigsep_dac, never imports them at all); CI/dev installs should not
+# pull them from git. ----
 
 [hardware.casperfpga]
 # SNAP board driver (CASPER collaboration). Imported by
@@ -79,10 +82,33 @@ sha256  = ""
 # `pip install --require-hashes -r hardware-requirements.txt` in the
 # image chroot. Drops `future<2` (never imported in source; still pulled
 # transitively by katcp). See EIGSEP/casperfpga PR for the audit.
+#
+# The RFSoC needs casperfpga too (eigsep_dac's programmer and the 2026
+# dual-BRAM loader import it), but the board carries its own copy (conda
+# env install; the 2026 loader ships a checkout beside it) — the wheel
+# built from this entry serves the Pi only. The dual-DAC MTS calls
+# (run_mts, get_mts_latency, mts_debug_info) exist from v0.7.1, so never
+# pin below that.
 version = "0.7.2"
 tag     = "v0.7.2"
 source  = "https://github.com/EIGSEP/casperfpga"
 roles   = ["backend"]
+
+[hardware.eigsep_dac]
+# RFSoC2x2 DAC programmer + pseudorandom waveform helpers. Runs on the
+# RFSoC itself, not on any Pi — hence roles = []: no Pi role imports it,
+# so doctor must never flag it missing. The wheel is staged in the
+# wheelhouse so a field operator can rsync it from the Pi to the RFSoC
+# for install or hot-fix without internet. Pure-Python wheel
+# (py3-none-any), so the board's py3.10 conda env installs it even
+# though the wheelhouse resolve targets the manifest python above.
+# Must match the tag pinned in [firmware.rfsoc]; the host programmer
+# and the firmware/waveform bundle are produced together, and the
+# programmer assumes the npz schema.
+version = "0.3.0"
+tag     = "v0.3.0"
+source  = "https://github.com/EIGSEP/eigsep_dac"
+roles   = []
 
 [hardware.lgpio]
 # gpiozero's pin-factory backend for Pi-side GPIO (picohost declares
@@ -183,17 +209,28 @@ script   = "build.sh"
 artifact = "build/pico_multi.uf2"
 service  = "picomanager.service"
 
-[firmware.rfsoc_bitstream]
-# Produced by a script in eigsep_dac; flashed to the RFSoC. eigsep_dac is
-# not release-managed, so we pin by commit SHA. loader.py is vendored at
-# this commit into firmware/rfsoc/loader.py. The .npz lives on the
-# backend Pi at /opt/eigsep/firmware/rfsoc/ where eigsep-observe.service
-# loads it via casperfpga; panda never reads it.
-version = "2026-04-01"
-asset   = "eigsep_vivaldi_2026-04-01.npz"
+[firmware.rfsoc]
+# rfsoc_2026.tar.gz from eigsep_dac's GitHub Release: the dual-BRAM
+# loader script, the 2026 fpg/dtbo pair, and both dual-channel waveform
+# npz files. Unpacked on the RFSoC it reproduces the tested
+# /home/eigsep/eigsep/rfsoc_2026 layout (the dtbo must sit next to the
+# fpg; the on-board casperfpga checkout is the one piece not bundled).
+# The tag here must equal [hardware.eigsep_dac].tag — the host
+# programmer and the firmware/waveforms are produced together, and the
+# loader assumes the npz schema. Staged at /opt/eigsep/firmware/rfsoc/
+# on the backend Pi for the operator to scp to the RFSoC (10.10.10.13);
+# panda never reads it. (Entry key doubles as the staging dir name —
+# fetch_firmware.py writes to firmware/<key>/ — which is why this is
+# `rfsoc`, matching the image scripts, not `rfsoc_bitstream`.)
+#
+# Replaces the old rfsoc_bitstream entry whose eigsep_vivaldi npz asset
+# never existed as a release artifact.
+version = "v0.3.0"
+asset   = "rfsoc_2026.tar.gz"
 source  = "https://github.com/EIGSEP/eigsep_dac"
-commit  = ""
-sha256  = ""
+tag     = "v0.3.0"
+commit  = "8e7aa1365e4f891523f2401928dc586e4fbf7bbb"
+sha256  = "926fa1238c189a77ef430b544b126d37ad2979abd881a8ca22841b0d34c03be6"
 roles   = ["backend"]
 
 # ---- External binaries (proprietary, operator-installed) ----

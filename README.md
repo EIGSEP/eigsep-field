@@ -37,7 +37,8 @@ links to those sources rather than restating them.
 | `eigsep_observing`    | EIGSEP/eigsep_observing                     | top orchestrator                       |
 | `pyvalon`             | EIGSEP/pyvalon                              | Valon synth CLI; standalone            |
 | pico `.uf2`           | EIGSEP/pico-firmware (C/CMake)              | flashed via picotool                   |
-| rfsoc `.npz`          | produced from EIGSEP/eigsep_dac             | RFSoC bitstream                        |
+| rfsoc `.tar.gz` bundle   | produced from EIGSEP/eigsep_dac             | RFSoC firmware + waveforms               |
+| `eigsep_dac`          | EIGSEP/eigsep_dac                           | RFSoC-side host programmer (off-PyPI)  |
 
 ## Quickstart (dev host)
 
