@@ -8,5 +8,6 @@ commit  = ""
 sha256  = ""
 
 # Notes:
-#   loader.py in this directory is VENDORED from eigsep_dac at the
-#   pinned commit. Re-vendor when bumping.
+#   The host programmer for this bitstream is the eigsep_dac wheel,
+#   pinned in the top-level manifest.toml under [hardware.eigsep_dac].
+#   Its tag must match this `commit`.

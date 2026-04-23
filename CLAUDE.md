@@ -59,11 +59,16 @@ from `manifest.toml`. Change `manifest.toml`, then run
 ## When adding a hardware-only (off-PyPI) package
 
 `[hardware.*]` entries describe Python packages that aren't on PyPI and
-are only needed on Pi nodes that talk to real hardware. `casperfpga` is
-the current example. They are **not** dependencies of the `eigsep-field`
-meta package — ground stack code lazy-imports them — so CI/dev installs
-never fetch them. On the Pi, `install-field.sh` installs them from
-pre-built aarch64 wheels staged in the wheelhouse.
+are only needed on field nodes that talk to real hardware. Current
+examples: `casperfpga` (Pi-side, SNAP driver, lazy-imported by
+`eigsep_observing`) and `eigsep_dac` (RFSoC-side, host programmer for
+the RFSoC2x2 bitstream; must track `[firmware.rfsoc_bitstream].commit`).
+They are **not** dependencies of the `eigsep-field` meta package —
+ground stack code lazy-imports them or doesn't import them at all — so
+CI/dev installs never fetch them. `install-field.sh` installs the
+Pi-side wheels on the Pi from pre-built aarch64 wheels staged in the
+wheelhouse. RFSoC-side wheels are rsync'd from the Pi wheelhouse to
+the RFSoC by the operator.
 
 To add one:
 

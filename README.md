@@ -38,6 +38,7 @@ links to those sources rather than restating them.
 | `pyvalon`             | EIGSEP/pyvalon                              | Valon synth CLI; standalone            |
 | pico `.uf2`           | EIGSEP/pico-firmware (C/CMake)              | flashed via picotool                   |
 | rfsoc `.npz`          | produced from EIGSEP/eigsep_dac             | RFSoC bitstream                        |
+| `eigsep_dac`          | EIGSEP/eigsep_dac                           | RFSoC-side host programmer (off-PyPI)  |
 
 ## Quickstart (dev host)
 
