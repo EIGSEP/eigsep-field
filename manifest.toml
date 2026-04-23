@@ -59,9 +59,12 @@ sha256  = ""
 # (eigsep_dac); CI/dev installs should not pull them from git. ----
 
 [hardware.casperfpga]
-# SNAP board driver (CASPER collaboration). Our fork adds the I2C helpers
-# needed for EIGSEP. eigsep_observing lazy-imports it (fpga.py, blocks.py)
-# so only the ground computer requires it at runtime.
+# SNAP/RFSoC2x2 board driver (CASPER collaboration). Our fork adds the
+# I2C helpers needed for EIGSEP. Required at runtime on both field
+# nodes: the Pi lazy-imports it via eigsep_observing (fpga.py, blocks.py)
+# to talk to the SNAP, and the RFSoC imports it via eigsep_dac
+# (program_board.py) to program the DAC. Both callers lazy-import so dev
+# installs don't need it.
 version = "0.6.0"
 tag     = "v0.6.0"
 source  = "https://github.com/EIGSEP/casperfpga"
