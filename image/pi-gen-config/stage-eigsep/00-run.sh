@@ -1,7 +1,8 @@
 #!/bin/bash -e
 # Stage runs in chroot. Installs system packages, drops the offline
-# wheelhouse, installs the eigsep-field meta-package, and enables
-# systemd units.
+# wheelhouse, installs the eigsep-field meta-package, stages systemd
+# unit files, and enables the activation="always" services declared in
+# manifest.toml's [services.*] table.
 #
 # Inputs expected under $ROOTFS_DIR/tmp/stage-eigsep-files/ (staged by
 # the outer image.yml workflow before invoking pi-gen):
@@ -20,13 +21,25 @@ rsync -a files/wheels/    "${ROOTFS_DIR}/opt/eigsep/wheels/"
 rsync -a files/firmware/  "${ROOTFS_DIR}/opt/eigsep/firmware/"
 install -m 0644 files/etc-eigsep/manifest.toml "${ROOTFS_DIR}/etc/eigsep/manifest.toml"
 
+# All unit files in files/systemd/ land in /etc/systemd/system/. The
+# set of files here is the source of truth for the file-copy step; the
+# manifest decides which of them are enabled at build time vs. first boot.
+install -d "${ROOTFS_DIR}/etc/systemd/system"
+for unit in files/systemd/*.service files/systemd/*.target; do
+    [ -f "$unit" ] || continue
+    install -m 0644 "$unit" \
+        "${ROOTFS_DIR}/etc/systemd/system/$(basename "$unit")"
+done
+
 on_chroot << 'EOF'
 set -e
 apt-get update
 apt-get install -y --no-install-recommends \
     python3 python3-venv python3-pip \
     redis-server \
+    isc-dhcp-server \
     picotool \
+    xvfb \
     git curl
 
 python3 -m venv /opt/eigsep/venv
@@ -37,15 +50,13 @@ python3 -m venv /opt/eigsep/venv
     eigsep-field
 
 ln -sf /opt/eigsep/venv/bin/eigsep-field /usr/local/bin/eigsep-field
-EOF
 
-install -m 0644 files/systemd/eigsep-panda.service    "${ROOTFS_DIR}/etc/systemd/system/eigsep-panda.service"
-install -m 0644 files/systemd/eigsep-observer.service "${ROOTFS_DIR}/etc/systemd/system/eigsep-observer.service"
-install -m 0644 files/systemd/eigsep.target           "${ROOTFS_DIR}/etc/systemd/system/eigsep.target"
+# Do not start isc-dhcp-server at image build time — only the one Pi
+# that's given `dhcp = true` in /boot/eigsep-role.conf should run it.
+systemctl disable isc-dhcp-server.service || true
 
-on_chroot << 'EOF'
-systemctl enable redis-server.service
-systemctl enable eigsep-panda.service || true
-systemctl enable eigsep-observer.service || true
-systemctl enable eigsep.target
+# Enable every activation="always" service from manifest.toml.
+# Role-scoped services are installed but left disabled; first boot's
+# eigsep-first-boot.service enables the matching subset.
+/opt/eigsep/venv/bin/python -m eigsep_field._image_install enable-always
 EOF

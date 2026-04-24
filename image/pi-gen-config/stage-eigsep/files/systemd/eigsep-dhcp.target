@@ -1,0 +1,7 @@
+[Unit]
+Description=EIGSEP DHCP server (exactly one Pi per LAN)
+Wants=isc-dhcp-server.service
+After=network-online.target
+
+[Install]
+WantedBy=multi-user.target

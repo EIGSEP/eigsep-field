@@ -1,8 +1,8 @@
 [Unit]
-Description=EIGSEP PandaClient (producer side)
+Description=EIGSEP PandaClient (antenna-side producer)
 After=network-online.target redis-server.service
 Wants=redis-server.service
-PartOf=eigsep.target
+PartOf=eigsep-panda.target
 
 [Service]
 Type=simple
@@ -13,4 +13,4 @@ RestartSec=5
 Environment=PYTHONUNBUFFERED=1
 
 [Install]
-WantedBy=eigsep.target
+WantedBy=eigsep-panda.target

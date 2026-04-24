@@ -1,7 +1,0 @@
-[Unit]
-Description=EIGSEP field services
-Wants=redis-server.service eigsep-panda.service eigsep-observer.service
-After=network-online.target
-
-[Install]
-WantedBy=multi-user.target

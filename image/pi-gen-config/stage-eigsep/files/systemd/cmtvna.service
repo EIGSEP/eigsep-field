@@ -1,0 +1,22 @@
+# Image-layout copy of scripts/cmtvna.service from the cmt_vna repo. The
+# cmtvna binary ships out-of-band (not via pip) under /opt/eigsep/cmt-vna/;
+# upstream dev layout uses /home/eigsep/CMT-VNA/. Drift against upstream
+# (After=, User=, Restart=, ExecStart argv[0], socket port) is enforced by
+# scripts/check-services-drift.py.
+[Unit]
+Description=Start cmtvna binary file in socket mode
+After=network.target
+PartOf=eigsep-panda.target
+
+[Service]
+Type=simple
+User=eigsep
+WorkingDirectory=/opt/eigsep/cmt-vna/bin
+ExecStart=xvfb-run -a /opt/eigsep/cmt-vna/bin/cmtvna --socket-server on --socket-port 5025 --model-name R60
+Restart=on-failure
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=eigsep-panda.target

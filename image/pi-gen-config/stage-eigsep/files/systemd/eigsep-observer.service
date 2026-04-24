@@ -1,8 +1,8 @@
 [Unit]
-Description=EIGSEP EigObserver (consumer / ground-side)
+Description=EIGSEP EigObserver (backend-side consumer)
 After=network-online.target redis-server.service
 Wants=redis-server.service
-PartOf=eigsep.target
+PartOf=eigsep-backend.target
 
 [Service]
 Type=simple
@@ -13,4 +13,4 @@ RestartSec=5
 Environment=PYTHONUNBUFFERED=1
 
 [Install]
-WantedBy=eigsep.target
+WantedBy=eigsep-backend.target

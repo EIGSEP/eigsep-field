@@ -33,7 +33,7 @@ sha256  = ""
 pypi    = "eigsep-vna"
 version = "1.3.0"
 tag     = "v1.3.0"
-source  = "https://github.com/EIGSEP/cmt_vna"
+source  = "https://github.com/EIGSEP/CMT-VNA"
 sha256  = ""
 
 [packages.eigsep_observing]
@@ -97,7 +97,93 @@ asset = "eigsep-field-2026.4.0.img.tar.xz"
 # Debian package version of redis-server installed by pi-gen. eigsep_redis
 # is the code contract; this pins the server.
 redis_server_apt = "7:7.0.15-1"
+# Serves DHCP on the private LAN; exactly one Pi per LAN enables it (see
+# [services.isc_dhcp]). Config lives out-of-band in the dhcp_config sibling
+# repo.
+isc_dhcp_server_apt = "4.4.3-P1-2"
 # Target platform for the wheelhouse. Field deployment is Pi4 running
 # 64-bit Raspberry Pi OS, so aarch64. (Pi4 also supports 32-bit armv7l
 # but we're not using that variant.)
 platform = "linux_aarch64"
+
+# ---- Systemd services baked into the image ----
+#
+# The image is identical on every Pi. Per-Pi differentiation happens at
+# enable time: activation="always" services are enabled at image build;
+# activation="role" services are installed but only enabled by
+# eigsep-first-boot.service when /boot/eigsep-role.conf picks the matching
+# role.
+#
+# kind:
+#   apt      — provided by an APT package; no unit file shipped here.
+#   local    — unit file lives in files/systemd/ and is owned by this repo.
+#   sibling  — unit file lives in files/systemd/ but the authority is a
+#              sibling repo; tag + source_path pin the upstream for drift CI.
+
+[services.redis]
+kind       = "apt"
+unit       = "redis-server.service"
+activation = "always"
+
+[services.isc_dhcp]
+kind       = "apt"
+unit       = "isc-dhcp-server.service"
+activation = "role"
+role       = "dhcp-master"
+
+[services.picomanager]
+kind        = "sibling"
+unit        = "picomanager.service"
+activation  = "role"
+role        = "panda"
+source      = "https://github.com/EIGSEP/pico-firmware"
+# Must match [packages.picohost].tag — enforced by check-services-drift.
+tag         = "v3.0.0"
+source_path = "picohost/pico-manager.service"
+
+[services.cmtvna]
+kind        = "sibling"
+unit        = "cmtvna.service"
+activation  = "role"
+role        = "panda"
+source      = "https://github.com/EIGSEP/CMT-VNA"
+# Must match [packages.eigsep-vna].tag — enforced by check-services-drift.
+tag         = "v1.3.0"
+source_path = "scripts/cmtvna.service"
+
+[services.eigsep_panda]
+kind       = "local"
+unit       = "eigsep-panda.service"
+activation = "role"
+role       = "panda"
+
+[services.eigsep_observer]
+kind       = "local"
+unit       = "eigsep-observer.service"
+activation = "role"
+role       = "backend"
+
+[services.eigsep_panda_target]
+kind       = "local"
+unit       = "eigsep-panda.target"
+activation = "role"
+role       = "panda"
+
+[services.eigsep_backend_target]
+kind       = "local"
+unit       = "eigsep-backend.target"
+activation = "role"
+role       = "backend"
+
+[services.eigsep_dhcp_target]
+kind       = "local"
+unit       = "eigsep-dhcp.target"
+activation = "role"
+role       = "dhcp-master"
+
+[services.eigsep_first_boot]
+# Oneshot that runs on every boot until /boot/eigsep-role.conf has been
+# applied; enables the role-matching services and self-disables.
+kind       = "local"
+unit       = "eigsep-first-boot.service"
+activation = "always"

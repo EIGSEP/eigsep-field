@@ -1,0 +1,7 @@
+[Unit]
+Description=EIGSEP backend role (digital backend: SNAP + observer)
+Wants=redis-server.service eigsep-observer.service
+After=network-online.target
+
+[Install]
+WantedBy=multi-user.target

@@ -15,6 +15,26 @@ a git SHA (not `main`) so they stay stable as the repos evolve.
 | [Sensor schemas](sensor-schemas.md)          | `SENSOR_SCHEMAS` in `eigsep_observing/src/eigsep_observing/io.py`                                 |
 | [Bus roles](bus-roles.md)                    | Writer/reader-per-bus pattern; see `eigsep_redis/CLAUDE.md`                                       |
 | [Producer contracts](producer-contracts.md)  | `eigsep_observing/src/eigsep_observing/contract_tests/` (producer conformance + key uniqueness)   |
+| [Systemd services](#systemd-services)        | Sibling unit files pinned in `manifest.toml` `[services.*]`; drift-checked by `scripts/check_services_drift.py` |
+
+## Systemd services
+
+The Pi image declares systemd services in `manifest.toml` `[services.*]`.
+Each sibling-owned unit file is copied into
+`image/pi-gen-config/stage-eigsep/files/systemd/` (with paths rewritten
+for the image's `/opt/eigsep/venv` layout) and tracked against the
+permalink below.
+
+| Service        | Authority                                                                                                           |
+|----------------|---------------------------------------------------------------------------------------------------------------------|
+| `picomanager`  | [pico-firmware / picohost/pico-manager.service](https://github.com/EIGSEP/pico-firmware/blob/v3.0.0/picohost/pico-manager.service) |
+| `cmtvna`       | [CMT-VNA / scripts/cmtvna.service](https://github.com/EIGSEP/CMT-VNA/blob/v1.3.0/scripts/cmtvna.service)             |
+
+`redis-server` and `isc-dhcp-server` are apt-provided (no unit file
+shipped here). `eigsep-panda.service`, `eigsep-observer.service`, and the
+role targets (`eigsep-panda.target`, `eigsep-backend.target`,
+`eigsep-dhcp.target`) plus `eigsep-first-boot.service` are
+eigsep-field-owned — no sibling authority, no drift tracking.
 
 ## Structure of each doc
 

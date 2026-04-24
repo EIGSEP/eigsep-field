@@ -1,0 +1,17 @@
+[Unit]
+Description=EIGSEP first-boot role selector
+# Applies /boot/eigsep-role.conf once per image flash: enables the matching
+# role's [services.*] entries, then self-disables. Idempotent — editing the
+# role file and `systemctl enable eigsep-first-boot.service; reboot` re-rolls
+# the Pi.
+ConditionPathExists=/boot/eigsep-role.conf
+After=multi-user.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/eigsep-field _apply-role /boot/eigsep-role.conf
+RemainAfterExit=no
+
+[Install]
+WantedBy=multi-user.target

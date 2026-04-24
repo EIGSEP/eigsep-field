@@ -1,0 +1,25 @@
+# Image-layout copy of picohost/pico-manager.service from the pico-firmware
+# repo. Upstream (dev-clone) version uses %h/venv and %h/eigsep/pico-firmware;
+# the field image uses /opt/eigsep/venv and bundles firmware under
+# /opt/eigsep/firmware/pico/. Drift against upstream (After=, Wants=, User=,
+# Restart=, ExecStart argv[0]) is enforced by scripts/check-services-drift.py.
+[Unit]
+Description=EIGSEP Pico Manager
+After=redis-server.service
+Requires=redis-server.service
+PartOf=eigsep-panda.target
+
+[Service]
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/eigsep/venv/bin/pico-manager --config /etc/eigsep/pico_config.json --uf2 /opt/eigsep/firmware/pico
+Restart=always
+RestartSec=5
+TimeoutStartSec=120
+
+User=eigsep
+Group=eigsep
+WorkingDirectory=/opt/eigsep
+SyslogIdentifier=eigsep-pico
+
+[Install]
+WantedBy=eigsep-panda.target

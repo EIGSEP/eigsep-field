@@ -78,6 +78,36 @@ To add one:
    dev machine running the wheelhouse build. (Native builds are used
    when the host is already the target arch.)
 
+## When adding a systemd service to the image
+
+Services are declared in `manifest.toml` `[services.*]` and driven from
+there by image build (`scripts/_image_install.py`'s `enable-always` step),
+`eigsep-field doctor`, and `eigsep-field services`. The image is
+uniform across Pis; per-Pi differentiation is the role set in
+`/boot/eigsep-role.conf` applied by `eigsep-first-boot.service`.
+
+1. Add `[services.<name>]` to `manifest.toml` with:
+   - `kind` — `"apt"` (provided by a Debian package), `"local"` (owned by
+     this repo), or `"sibling"` (owned by a sibling repo, tracked for
+     drift).
+   - `unit` — the systemd unit filename.
+   - `activation` — `"always"` (enabled on every Pi at build time) or
+     `"role"` (enabled on first boot when `/boot/eigsep-role.conf` matches).
+   - `role` — required when `activation = "role"`. One of `"panda"`,
+     `"backend"`, or `"dhcp-master"`.
+   - `source` / `tag` / `source_path` — required for `kind = "sibling"`;
+     tag must match the corresponding `[packages.*].tag`.
+2. For `kind = "local"` or `kind = "sibling"`, drop the unit file (adapted
+   for the image's `/opt/eigsep/venv` layout) in
+   `image/pi-gen-config/stage-eigsep/files/systemd/`.
+3. For role services, update the role's `.target` (`eigsep-panda.target`,
+   `eigsep-backend.target`, `eigsep-dhcp.target`) to `Wants=` the new unit.
+4. For `kind = "sibling"`, add a permalink row in
+   `docs/interface/README.md` under the Systemd services section.
+5. Run `python3 scripts/check_services_drift.py` to confirm tag alignment
+   and semantic parity with upstream. CI enforces this via the
+   `services-drift` job.
+
 ## When a sibling edits a contract surface (keys, SENSOR_SCHEMAS)
 
 Interface docs (`docs/interface/redis-keys.md`, `sensor-schemas.md`) carry
