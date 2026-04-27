@@ -5,18 +5,35 @@ up, the dhcp-master serves DHCP and runs `chrony` with `local stratum
 10`, and the cluster mutually agrees on time. The laptop is a
 convenience for the operator, not a dependency for the system.
 
-What the laptop needs for full ops:
+## EIGSEP private LAN address conventions
 
-- **Wired Ethernet on the EIGSEP LAN.** The dhcp-master Pi serves
-  `10.10.10.0/24` on eth0; the laptop pulls a DHCP lease from the
-  dynamic range (`10.10.10.12`–`10.10.10.255`).
-- **SSH client.** Reaching the Pis at `10.10.10.1` (dhcp-master) and
-  the static reservations in
-  [`image/pi-gen-config/stage-eigsep/files/dhcp/dhcpd.conf`](../../image/pi-gen-config/stage-eigsep/files/dhcp/dhcpd.conf).
-- **(Optional) chrony serving NTP.** Reserve `10.10.10.2` for the
-  laptop in `dhcpd.conf` and run chrony with `allow 10.10.10.0/24`.
-  This upgrades the cluster from "self-agreed" to "true UTC" while
-  the laptop is connected. Without it, the dhcp-master falls back to
+| Address       | Host                                      |
+|---------------|-------------------------------------------|
+| `10.10.10.10` | ground / dhcp-master Pi (published entry) |
+| `10.10.10.11` | panda Pi                                  |
+| `10.10.10.12` | SNAP board #1                             |
+| `10.10.10.13` | SNAP board #2                             |
+| `10.10.10.17` | operator laptop (any laptop, static)      |
+| `.20`–`.255`  | DHCP dynamic pool                         |
+
+`10.10.10.10` is the address collaborators should know — it's the
+ground Pi.
+
+## What the laptop needs
+
+- **Wired Ethernet on the EIGSEP LAN.**
+- **Static IP `10.10.10.17/24` on that interface, no DHCP.** The
+  ground Pi does not reserve `.17` by MAC, so a DHCP-leased laptop
+  would land at a random `.20`+ address. Configuring `.17` statically
+  is what makes any laptop swap into `chrony`'s expected upstream
+  address — if your laptop dies in the field, a backup laptop that
+  follows this doc lands at the same IP and the cluster keeps full
+  UTC discipline. (Linux: NetworkManager → IPv4 → Manual; macOS:
+  System Settings → Network → Ethernet → Configure IPv4 → Manually.)
+- **SSH client.** Reach the Pis at the addresses above.
+- **(Optional) chrony serving NTP** with `allow 10.10.10.0/24`. This
+  upgrades the cluster from "self-agreed" to "true UTC" while the
+  laptop is connected. Without it, the dhcp-master falls back to
   `local stratum 10` and the cluster keeps mutually agreed time, just
   not pinned to UTC.
 
