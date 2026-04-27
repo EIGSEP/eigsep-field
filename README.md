@@ -71,10 +71,11 @@ sudo /opt/eigsep/scripts/install-field.sh
 eigsep-field verify
 ```
 
-The Pis depend on the operator laptop for time discipline (the
-dhcp-master Pi serves NTP to the LAN, with the laptop as upstream).
-See [docs/operator/laptop-ntp.md](docs/operator/laptop-ntp.md) for
-laptop-side setup.
+The Pi image is self-sufficient — DHCP, NTP, and the observing
+services all run on the Pis with no laptop required. See
+[docs/operator/laptop.md](docs/operator/laptop.md) for the (short)
+list of capabilities the operator laptop should provide for full
+field ops.
 
 ## Release / bump workflow
 

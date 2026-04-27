@@ -41,6 +41,13 @@ for conf in files/chrony/*.conf; do
         "${ROOTFS_DIR}/etc/eigsep/chrony/$(basename "$conf")"
 done
 
+# Install DHCP config. Inert on Pis that don't have dhcp = true in
+# /boot/eigsep-role.conf — isc-dhcp-server is role-scoped to dhcp-master.
+install -m 0644 files/dhcp/dhcpd.conf \
+    "${ROOTFS_DIR}/etc/dhcp/dhcpd.conf"
+install -m 0644 files/dhcp/isc-dhcp-server \
+    "${ROOTFS_DIR}/etc/default/isc-dhcp-server"
+
 on_chroot << 'EOF'
 set -e
 apt-get update
