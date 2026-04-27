@@ -71,6 +71,11 @@ sudo /opt/eigsep/scripts/install-field.sh
 eigsep-field verify
 ```
 
+The Pis depend on the operator laptop for time discipline (the
+dhcp-master Pi serves NTP to the LAN, with the laptop as upstream).
+See [docs/operator/laptop-ntp.md](docs/operator/laptop-ntp.md) for
+laptop-side setup.
+
 ## Release / bump workflow
 
 1. Open a `release-coordination` issue.

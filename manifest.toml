@@ -101,6 +101,12 @@ redis_server_apt = "7:7.0.15-1"
 # [services.isc_dhcp]). Config lives out-of-band in the dhcp_config sibling
 # repo.
 isc_dhcp_server_apt = "4.4.3-P1-2"
+# chrony disciplines time on every Pi; see [services.chrony]. The
+# dhcp-master Pi is the LAN time server (uses the operator laptop at
+# 10.10.10.2 as upstream when present); other Pis sync from the
+# dhcp-master at 10.10.10.1. Per-role chrony.conf snippet is staged to
+# /etc/eigsep/chrony/ and symlinked at first boot by _cmd_apply_role.
+chrony_apt = "4.3-2+deb12u1"
 # Target platform for the wheelhouse. Field deployment is Pi4 running
 # 64-bit Raspberry Pi OS, so aarch64. (Pi4 also supports 32-bit armv7l
 # but we're not using that variant.)
@@ -123,6 +129,14 @@ platform = "linux_aarch64"
 [services.redis]
 kind       = "apt"
 unit       = "redis-server.service"
+activation = "always"
+
+[services.chrony]
+# Time sync. Every Pi runs chrony; the role-applier symlinks either
+# server.conf (dhcp-master) or client.conf (others) into
+# /etc/chrony/conf.d/eigsep.conf at first boot.
+kind       = "apt"
+unit       = "chrony.service"
 activation = "always"
 
 [services.isc_dhcp]

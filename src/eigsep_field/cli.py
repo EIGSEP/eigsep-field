@@ -292,6 +292,36 @@ def _write_role_file(role_cfg: RoleConfig) -> None:
     ROLE_FILE.write_text("\n".join(lines) + "\n")
 
 
+def _apply_chrony_snippet(role_cfg: RoleConfig) -> int:
+    """Symlink the role-appropriate chrony snippet and reload chrony.
+
+    The snippets are staged into /etc/eigsep/chrony/ at image build
+    time. Here we pick server.conf (dhcp-master) or client.conf (rest)
+    and link it as /etc/chrony/conf.d/eigsep.conf — chrony's default
+    config already does ``confdir /etc/chrony/conf.d``, so the snippet
+    is additive.
+    """
+    src_dir = Path("/etc/eigsep/chrony")
+    snippet = src_dir / ("server.conf" if role_cfg.dhcp else "client.conf")
+    target = Path("/etc/chrony/conf.d/eigsep.conf")
+    if not snippet.exists():
+        print(
+            f"  warn: {snippet} missing; chrony unchanged",
+            file=sys.stderr,
+        )
+        return 1
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if target.is_symlink() or target.exists():
+        target.unlink()
+    target.symlink_to(snippet)
+    rc, msg = systemctl("reload-or-restart", "chrony.service")
+    if rc != 0:
+        print(f"  warn: chrony reload failed: {msg}", file=sys.stderr)
+        return 1
+    print(f"  chrony: {target} -> {snippet}")
+    return 0
+
+
 def _cmd_apply_role(args: argparse.Namespace) -> int:
     """First-boot hook: apply /boot/eigsep-role.conf and self-disable."""
     path = Path(args.role_conf)
@@ -323,6 +353,8 @@ def _cmd_apply_role(args: argparse.Namespace) -> int:
         else:
             failed += 1
             print(f"  FAIL enable {unit} ({name}): {msg}", file=sys.stderr)
+
+    failed += _apply_chrony_snippet(role_cfg)
 
     _write_role_file(role_cfg)
 
