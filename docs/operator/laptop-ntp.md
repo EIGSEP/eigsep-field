@@ -52,10 +52,11 @@ depends on Homebrew prefix; `brew --prefix chrony` then look under
 `etc/chrony.conf`). Start with `sudo brew services start chrony`.
 
 If you'd rather not run a chrony server on macOS, you can skip this
-and accept that while the laptop is connected, the cluster won't have
-a true upstream — the dhcp-master Pi will fall back to its `local
-stratum 10` and the cluster will still mutually agree, just not on
-true UTC.
+and accept that if the laptop is connected but not actually serving
+NTP to the LAN (for example, chrony is not installed/running or
+UDP/123 is blocked), the cluster won't have a true upstream — the
+dhcp-master Pi will fall back to its `local stratum 10` and the
+cluster will still mutually agree, just not on true UTC.
 
 ## Verify
 
