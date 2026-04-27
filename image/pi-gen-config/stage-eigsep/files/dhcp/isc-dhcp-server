@@ -1,0 +1,6 @@
+# Defaults for isc-dhcp-server — installed at /etc/default/isc-dhcp-server
+# by the image build. dhcpd serves DHCP requests on eth0 only (the
+# private LAN; the Pi's other interfaces are not LAN-authoritative).
+
+INTERFACESv4="eth0"
+INTERFACESv6=""

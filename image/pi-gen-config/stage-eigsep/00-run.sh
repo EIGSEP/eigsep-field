@@ -31,6 +31,23 @@ for unit in files/systemd/*.service files/systemd/*.target; do
         "${ROOTFS_DIR}/etc/systemd/system/$(basename "$unit")"
 done
 
+# Stage chrony role snippets. eigsep-first-boot.service symlinks the
+# correct one into /etc/chrony/conf.d/eigsep.conf based on whether
+# /boot/eigsep-role.conf has dhcp = true (server) or not (client).
+install -d "${ROOTFS_DIR}/etc/eigsep/chrony"
+for conf in files/chrony/*.conf; do
+    [ -f "$conf" ] || continue
+    install -m 0644 "$conf" \
+        "${ROOTFS_DIR}/etc/eigsep/chrony/$(basename "$conf")"
+done
+
+# Install DHCP config. Inert on Pis that don't have dhcp = true in
+# /boot/eigsep-role.conf — isc-dhcp-server is role-scoped to dhcp-master.
+install -m 0644 files/dhcp/dhcpd.conf \
+    "${ROOTFS_DIR}/etc/dhcp/dhcpd.conf"
+install -m 0644 files/dhcp/isc-dhcp-server \
+    "${ROOTFS_DIR}/etc/default/isc-dhcp-server"
+
 on_chroot << 'EOF'
 set -e
 apt-get update
@@ -38,6 +55,7 @@ apt-get install -y --no-install-recommends \
     python3 python3-venv python3-pip \
     redis-server \
     isc-dhcp-server \
+    chrony \
     picotool \
     xvfb \
     git curl
@@ -54,6 +72,12 @@ ln -sf /opt/eigsep/venv/bin/eigsep-field /usr/local/bin/eigsep-field
 # Do not start isc-dhcp-server at image build time — only the one Pi
 # that's given `dhcp = true` in /boot/eigsep-role.conf should run it.
 systemctl disable isc-dhcp-server.service || true
+
+# Mask systemd-timesyncd so it can't fight chrony for the clock. The
+# chrony postinst usually masks it, but we mask explicitly to be robust
+# against pi-gen base image changes.
+systemctl disable systemd-timesyncd.service || true
+systemctl mask systemd-timesyncd.service || true
 
 # Enable every activation="always" service from manifest.toml.
 # Role-scoped services are installed but left disabled; first boot's

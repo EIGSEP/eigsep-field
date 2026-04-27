@@ -292,6 +292,86 @@ def _write_role_file(role_cfg: RoleConfig) -> None:
     ROLE_FILE.write_text("\n".join(lines) + "\n")
 
 
+DHCP_MASTER_STATIC_IP = "10.10.10.10/24"
+_DHCPCD_BEGIN = "# BEGIN eigsep-field (managed)"
+_DHCPCD_END = "# END eigsep-field"
+
+
+def _apply_dhcp_master_static_ip(role_cfg: RoleConfig) -> int:
+    """Pin eth0 to 10.10.10.10/24 on the dhcp-master Pi.
+
+    isc-dhcp-server can't bind without a static IP on the interface
+    it serves, and the rest of the LAN expects to reach the
+    dhcp-master at 10.10.10.10. We rewrite a managed block in
+    /etc/dhcpcd.conf (Raspberry Pi OS Lite's default DHCP client)
+    between BEGIN/END markers, then restart dhcpcd. Idempotent:
+    re-running replaces the block in place.
+
+    No-op when role_cfg.dhcp is False.
+    """
+    if not role_cfg.dhcp:
+        return 0
+    conf = Path("/etc/dhcpcd.conf")
+    if not conf.exists():
+        print(
+            f"  warn: {conf} missing; cannot pin dhcp-master static IP",
+            file=sys.stderr,
+        )
+        return 1
+    block = (
+        f"{_DHCPCD_BEGIN} — dhcp-master static IP.\n"
+        "# eigsep-field rewrites this block on every role apply.\n"
+        "# Authority: image/pi-gen-config/stage-eigsep/.\n"
+        "interface eth0\n"
+        f"static ip_address={DHCP_MASTER_STATIC_IP}\n"
+        f"{_DHCPCD_END}\n"
+    )
+    existing = conf.read_text()
+    if _DHCPCD_BEGIN in existing and _DHCPCD_END in existing:
+        before, _, rest = existing.partition(_DHCPCD_BEGIN)
+        _, _, after = rest.partition(_DHCPCD_END + "\n")
+        new = before.rstrip() + "\n\n" + block + after.lstrip()
+    else:
+        new = existing.rstrip() + "\n\n" + block
+    conf.write_text(new)
+    rc, msg = systemctl("restart", "dhcpcd.service")
+    if rc != 0:
+        print(f"  warn: dhcpcd restart failed: {msg}", file=sys.stderr)
+        return 1
+    print(f"  dhcp-master: pinned eth0 to {DHCP_MASTER_STATIC_IP}")
+    return 0
+
+
+def _apply_chrony_snippet(role_cfg: RoleConfig) -> int:
+    """Symlink the role-appropriate chrony snippet and reload chrony.
+
+    The snippets are staged into /etc/eigsep/chrony/ at image build
+    time. Here we pick server.conf (dhcp-master) or client.conf (rest)
+    and link it as /etc/chrony/conf.d/eigsep.conf — chrony's default
+    config already does ``confdir /etc/chrony/conf.d``, so the snippet
+    is additive.
+    """
+    src_dir = Path("/etc/eigsep/chrony")
+    snippet = src_dir / ("server.conf" if role_cfg.dhcp else "client.conf")
+    target = Path("/etc/chrony/conf.d/eigsep.conf")
+    if not snippet.exists():
+        print(
+            f"  warn: {snippet} missing; chrony unchanged",
+            file=sys.stderr,
+        )
+        return 1
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if target.is_symlink() or target.exists():
+        target.unlink()
+    target.symlink_to(snippet)
+    rc, msg = systemctl("reload-or-restart", "chrony.service")
+    if rc != 0:
+        print(f"  warn: chrony reload failed: {msg}", file=sys.stderr)
+        return 1
+    print(f"  chrony: {target} -> {snippet}")
+    return 0
+
+
 def _cmd_apply_role(args: argparse.Namespace) -> int:
     """First-boot hook: apply /boot/eigsep-role.conf and self-disable."""
     path = Path(args.role_conf)
@@ -312,6 +392,10 @@ def _cmd_apply_role(args: argparse.Namespace) -> int:
     targets = services_for_role(services, role_cfg.role, role_cfg.dhcp)
 
     failed = 0
+    # Pin the static IP before role services come up — isc-dhcp-server
+    # binds to eth0 and needs the address ready first.
+    failed += _apply_dhcp_master_static_ip(role_cfg)
+
     for name, entry in targets:
         if entry.get("activation") != "role":
             # Always-services are already enabled at image build time.
@@ -323,6 +407,8 @@ def _cmd_apply_role(args: argparse.Namespace) -> int:
         else:
             failed += 1
             print(f"  FAIL enable {unit} ({name}): {msg}", file=sys.stderr)
+
+    failed += _apply_chrony_snippet(role_cfg)
 
     _write_role_file(role_cfg)
 
