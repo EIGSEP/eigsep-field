@@ -86,8 +86,7 @@ relevant here:
 |---------------|---------------------------------------|
 | `10.10.10.10` | ground / dhcp-master Pi (static)      |
 | `10.10.10.11` | panda Pi (DHCP reservation)           |
-| `10.10.10.12` | SNAP board #1 (DHCP reservation)      |
-| `10.10.10.13` | SNAP board #2 (DHCP reservation)      |
+| `10.10.10.12` | active SNAP board (DHCP reservation; both physical units share this address — spare-only, never powered simultaneously) |
 
 `.10` is the published entry point. Collaborators reach the system
 there.

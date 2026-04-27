@@ -11,8 +11,7 @@ convenience for the operator, not a dependency for the system.
 |---------------|-------------------------------------------|
 | `10.10.10.10` | ground / dhcp-master Pi (published entry) |
 | `10.10.10.11` | panda Pi                                  |
-| `10.10.10.12` | SNAP board #1                             |
-| `10.10.10.13` | SNAP board #2                             |
+| `10.10.10.12` | active SNAP board (spare-only; both units same IP) |
 | `10.10.10.17` | operator laptop (any laptop, static)      |
 | `.20`–`.255`  | DHCP dynamic pool                         |
 
