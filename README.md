@@ -71,9 +71,12 @@ sudo /opt/eigsep/scripts/install-field.sh
 eigsep-field verify
 ```
 
+Sourcing a new Pi (including capturing its MAC for the DHCP
+reservation): [`docs/operator/new-pi.md`](docs/operator/new-pi.md).
+
 The Pi image is self-sufficient — DHCP, NTP, and the observing
 services all run on the Pis with no laptop required. See
-[docs/operator/laptop.md](docs/operator/laptop.md) for the (short)
+[`docs/operator/laptop.md`](docs/operator/laptop.md) for the (short)
 list of capabilities the operator laptop should provide for full
 field ops.
 
