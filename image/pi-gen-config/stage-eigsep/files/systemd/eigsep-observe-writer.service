@@ -1,0 +1,48 @@
+# Image-layout copy of deploy/systemd/eigsep-observe-writer.service
+# from eigsep_observing. Adapted only on path-shaped fields:
+# ExecStart resolves to /opt/eigsep/venv/bin/eigsep-observe (the
+# wheel-installed console script), and the unit is wrapped by
+# eigsep-backend.target instead of multi-user.target so role
+# activation gates it. Drift on After/Wants/User/Group/Restart and the
+# ExecStart argv[0] basename is enforced by
+# scripts/check_services_drift.py.
+[Unit]
+Description=EIGSEP corr-data file writer (eigsep-observe)
+Documentation=https://github.com/EIGSEP/eigsep_observing/blob/main/deploy/systemd/README.md
+After=network-online.target redis-server.service eigsep-observe.service
+Wants=network-online.target redis-server.service eigsep-observe.service
+PartOf=eigsep-backend.target
+# Unbounded retries — see eigsep-observe.service for rationale.
+StartLimitIntervalSec=0
+
+[Service]
+User=eigsep
+Group=eigsep
+ExecStart=/opt/eigsep/venv/bin/eigsep-observe
+
+# --- Recovery policy --------------------------------------------------
+# eigsep-observe no longer suicides on SNAP producer silence — the
+# liveness watchdog logs and keeps waiting because the SNAP-side
+# eigsep-observe.service handles producer recovery. So this unit
+# only restarts on genuine crashes (Python segfault, unhandled
+# exception in the corr or VNA thread, OOM).
+#
+# Unbounded retries match the supervisor: a bug-induced crash loop
+# surfaces as a stale "Last file" tile on the live-status dashboard,
+# not as systemd-gave-up.
+Restart=on-failure
+RestartSec=30s
+
+# eigsep-observe handles SIGINT cleanly (joins threads, flushes the
+# in-flight HDF5 file via try/finally). SIGTERM would skip the
+# finally; send SIGINT instead.
+KillSignal=SIGINT
+TimeoutStopSec=30s
+
+PrivateTmp=no
+
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=eigsep-backend.target

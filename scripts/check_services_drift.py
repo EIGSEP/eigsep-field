@@ -59,6 +59,8 @@ TRACKED: dict[str, tuple[str, ...]] = {
 TAG_PEERS: dict[str, str] = {
     "picomanager": "picohost",
     "cmtvna": "eigsep-vna",
+    "eigsep_observe": "eigsep_observing",
+    "eigsep_observe_writer": "eigsep_observing",
 }
 
 
