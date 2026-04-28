@@ -195,11 +195,32 @@ unit       = "eigsep-panda.service"
 activation = "role"
 role       = "panda"
 
-[services.eigsep_observer]
-kind       = "local"
-unit       = "eigsep-observer.service"
-activation = "role"
-role       = "backend"
+[services.eigsep_observe]
+# SNAP supervisor: wraps fpga_init.py --reinit -p with Restart=on-failure
+# so casperfpga register-read timeouts (SNAP rebooted, bitstream gone)
+# self-heal during overnight thermal cycling. See README in the source
+# repo for the rationale behind unbounded retries.
+kind        = "sibling"
+unit        = "eigsep-observe.service"
+activation  = "role"
+role        = "backend"
+source      = "https://github.com/EIGSEP/eigsep_observing"
+# Must match [packages.eigsep_observing].tag — enforced by check-services-drift.
+tag         = "v1.1.0"
+source_path = "deploy/systemd/eigsep-observe.service"
+
+[services.eigsep_observe_writer]
+# Corr-data file writer: wraps observe.py. Restarted on genuine crashes
+# (segfault/OOM/unhandled thread exception) — SNAP-side producer silence
+# is now log-only; recovery is the eigsep-observe.service supervisor's job.
+kind        = "sibling"
+unit        = "eigsep-observe-writer.service"
+activation  = "role"
+role        = "backend"
+source      = "https://github.com/EIGSEP/eigsep_observing"
+# Must match [packages.eigsep_observing].tag — enforced by check-services-drift.
+tag         = "v1.1.0"
+source_path = "deploy/systemd/eigsep-observe-writer.service"
 
 [services.eigsep_panda_target]
 kind       = "local"

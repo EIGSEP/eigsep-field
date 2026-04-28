@@ -1,0 +1,51 @@
+# Image-layout copy of deploy/systemd/eigsep-observe.service from
+# eigsep_observing. Adapted only on path-shaped fields: ExecStart
+# resolves to /opt/eigsep/venv/bin/eigsep-fpga-init (the wheel-installed
+# console script), and the unit is wrapped by eigsep-backend.target
+# instead of multi-user.target so role activation gates it. Drift
+# against upstream on After/Wants/User/Group/Restart and the ExecStart
+# argv[0] basename is enforced by scripts/check_services_drift.py.
+[Unit]
+Description=EIGSEP SNAP supervisor (eigsep-fpga-init --reinit -p)
+Documentation=https://github.com/EIGSEP/eigsep_observing/blob/main/deploy/systemd/README.md
+After=network-online.target redis-server.service
+Wants=network-online.target redis-server.service
+PartOf=eigsep-backend.target
+# Unbounded retries: the field deployment has no wifi, prime
+# observing is overnight, and a SNAP that thermal-cycles overnight
+# will self-heal as it cools. The operator-visible signal lives on
+# the live-status dashboard (Reinits tile + Last file freshness),
+# not on systemd giving up.
+StartLimitIntervalSec=0
+
+[Service]
+User=eigsep
+Group=eigsep
+ExecStart=/opt/eigsep/venv/bin/eigsep-fpga-init --reinit -p
+
+# --- Recovery policy --------------------------------------------------
+# Always re-init on crash. The observed failure mode is a casperfpga
+# register-read timeout — the SNAP has rebooted, bitstream is gone,
+# and a fresh sync_time per recovery is honest (each post-crash file
+# is its own observing block).
+Restart=on-failure
+RestartSec=30s
+
+# eigsep-fpga-init catches KeyboardInterrupt (SIGINT) and runs
+# fpga.end_observing() in a finally block, but does not handle
+# SIGTERM. Sending SIGINT instead lets the existing shutdown path
+# run cleanly; any process still alive after TimeoutStopSec gets
+# SIGKILL'd as a backstop.
+KillSignal=SIGINT
+TimeoutStopSec=30s
+
+# Hardware integration — disable systemd's private-tmp / namespace
+# hardening because casperfpga opens raw sockets to the SNAP and
+# may rely on shared paths.
+PrivateTmp=no
+
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=eigsep-backend.target
