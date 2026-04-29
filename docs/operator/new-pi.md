@@ -16,7 +16,11 @@ Each Pi runs one role:
 ## 2. Flash the latest image
 
 `eigsep-field-<release>.img.tar.xz` from the release artifacts. The
-image is uniform; per-Pi state is set by `/boot/eigsep-role.conf`.
+image is uniform across roles and across Pi 4 / Pi 5 (Raspberry Pi OS
+Bookworm 64-bit boots both); per-Pi state is set by
+`/boot/eigsep-role.conf`. Today panda runs on a Pi 4 and backend on a
+Pi 5, but role is decoupled from hardware — either role can run on
+either Pi.
 
 ## 3. Set the role on first boot
 

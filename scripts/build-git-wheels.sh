@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Build off-PyPI hardware Python wheels declared in manifest.toml's
 # [hardware.*] table. One wheel per entry is written to $OUT, built for
-# the target platform (default: linux_aarch64, i.e. the Pi4 field node).
+# the target platform (default: linux_aarch64, the field Pi nodes).
 #
 # When the host architecture already matches the target, builds natively.
 # Otherwise cross-builds via docker with qemu-user emulation — so this

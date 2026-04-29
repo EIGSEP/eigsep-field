@@ -107,9 +107,9 @@ isc_dhcp_server_apt = "4.4.3-P1-2"
 # dhcp-master at 10.10.10.1. Per-role chrony.conf snippet is staged to
 # /etc/eigsep/chrony/ and symlinked at first boot by _cmd_apply_role.
 chrony_apt = "4.3-2+deb12u1"
-# Target platform for the wheelhouse. Field deployment is Pi4 running
-# 64-bit Raspberry Pi OS, so aarch64. (Pi4 also supports 32-bit armv7l
-# but we're not using that variant.)
+# Target platform for the wheelhouse. Field deployment is 64-bit
+# Raspberry Pi OS on a mixed Pi 4 (panda) / Pi 5 (backend) fleet; both
+# are aarch64, so a single wheelhouse serves both.
 platform = "linux_aarch64"
 
 # ---- Systemd services baked into the image ----
