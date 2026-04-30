@@ -141,5 +141,25 @@ differ. `tests/test_interface_docs.py` is the same check as a pytest.
 
 ## Versioning
 
-Release identifier is calver (`YYYY.MM[.patch]`). Individual sibling packages
-keep their own semver; this repo pins them by `==` in the manifest.
+Release identifier is calver (`YYYY.MM[.patch]`). One release per field
+deployment / observing campaign — this is the blessed version tuple for that
+campaign, not a continuously-cut artifact. Individual sibling packages keep
+their own semver; this repo pins them by `==` in the manifest.
+
+Calver (not semver) because there is no API surface here to communicate
+stability about — the repo is a blessed tuple, so semver bumps would be
+performative. The calver value tells the reader when the campaign was cut.
+
+## Cutting a release
+
+Releases are operator-driven and manual. The canonical procedure lives in
+`.github/ISSUE_TEMPLATE/release-coordination.yml` — open that issue and
+follow its checklist. The tag (`vYYYY.MM.P`) is what triggers
+`wheelhouse.yml` and `image.yml`, so push it only after the release PR
+(manifest bump + lock refresh + interface-doc regen + release notes) has
+merged to `main`.
+
+We deliberately do **not** use `release-please` here (siblings do): calver
+isn't commit-driven, the source of truth is `manifest.toml` rather than
+`pyproject.toml`, and there's no PyPI publish to automate — the artifacts
+are the wheelhouse and image, both already produced from the tag.

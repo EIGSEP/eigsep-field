@@ -32,7 +32,9 @@ body:
         - label: Wrote `docs/releases/<release>.md`
         - label: Ran `./scripts/refresh-lock.sh`
         - label: CI green on PR (lint, manifest, lock-drift, smoke, contract)
-        - label: Tag pushed and `wheelhouse.yml` + `image.yml` succeeded
+        - label: Release PR merged to `main`
+        - label: Tag cut from the merge commit (`git tag -a vYYYY.MM.P -m "release YYYY.MM.P" && git push origin vYYYY.MM.P`)
+        - label: `wheelhouse.yml` + `image.yml` succeeded on the tag
         - label: Image verified in qemu / on a test Pi
         - label: `sync-downstream.yml` notifications filed in siblings
         - label: PR against `EIGSEP/EIGSEP.github.io` bumping `docs/_data/eigsep_field.yml :: tag` to the new release tag
