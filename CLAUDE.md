@@ -134,6 +134,10 @@ differ. `tests/test_interface_docs.py` is the same check as a pytest.
   downstream PRs on `field/<issue>-<slug>` branches.
 - Releases → `release-coordination` issue here, follow the checklist in
   its template.
+- The public website (`EIGSEP.github.io`) has a Software tab whose
+  outbound links are pinned to a single tag in
+  `docs/_data/eigsep_field.yml`. Bump it to the new release tag as part
+  of the release checklist; the bump retargets every link at once.
 
 ## Versioning
 

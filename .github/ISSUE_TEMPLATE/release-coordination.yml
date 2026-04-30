@@ -35,3 +35,4 @@ body:
         - label: Tag pushed and `wheelhouse.yml` + `image.yml` succeeded
         - label: Image verified in qemu / on a test Pi
         - label: `sync-downstream.yml` notifications filed in siblings
+        - label: PR against `EIGSEP/EIGSEP.github.io` bumping `docs/_data/eigsep_field.yml :: tag` to the new release tag
