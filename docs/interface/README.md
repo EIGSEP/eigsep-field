@@ -29,8 +29,8 @@ permalink below.
 |--------------------------|---------------------------------------------------------------------------------------------------------------------------------|
 | `picomanager`            | [pico-firmware / picohost/pico-manager.service](https://github.com/EIGSEP/pico-firmware/blob/v3.0.0/picohost/pico-manager.service) |
 | `cmtvna`                 | [CMT-VNA / scripts/cmtvna.service](https://github.com/EIGSEP/CMT-VNA/blob/v1.3.0/scripts/cmtvna.service)                         |
-| `eigsep-observe`         | [eigsep_observing / deploy/systemd/eigsep-observe.service](https://github.com/EIGSEP/eigsep_observing/blob/v1.1.0/deploy/systemd/eigsep-observe.service) |
-| `eigsep-observe-writer`  | [eigsep_observing / deploy/systemd/eigsep-observe-writer.service](https://github.com/EIGSEP/eigsep_observing/blob/v1.1.0/deploy/systemd/eigsep-observe-writer.service) |
+| `eigsep_observe`         | [eigsep_observing / deploy/systemd/eigsep-observe.service](https://github.com/EIGSEP/eigsep_observing/blob/v2.0.0/deploy/systemd/eigsep-observe.service) |
+| `eigsep_observe_writer`  | [eigsep_observing / deploy/systemd/eigsep-observe-writer.service](https://github.com/EIGSEP/eigsep_observing/blob/v2.0.0/deploy/systemd/eigsep-observe-writer.service) |
 
 `redis-server` and `isc-dhcp-server` are apt-provided (no unit file
 shipped here). `eigsep-panda.service` and the role targets
