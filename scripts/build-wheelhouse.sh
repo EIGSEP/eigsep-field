@@ -22,10 +22,30 @@ fi
 PY=$(python3 -c "import tomllib,sys; print(tomllib.load(open('$MANIFEST','rb'))['python'])")
 PLATFORM=${3:-$(python3 -c "import tomllib; print(tomllib.load(open('$MANIFEST','rb')).get('system',{}).get('platform','linux_aarch64'))")}
 
-echo "manifest: $MANIFEST"
-echo "python:   $PY"
-echo "platform: $PLATFORM"
-echo "output:   $OUT"
+# `linux_aarch64` is our canonical platform label (used in workflow
+# matrix names, image tarball filenames, and build-git-wheels.sh's
+# docker target). `uv pip compile` / `uv pip download`, however, want
+# uv's custom platform format (a Rust-like hyphenated manylinux tag
+# like `aarch64-manylinux_2_36`) — it rejects standard PEP tags like
+# `linux_aarch64` outright. Translate just for the uv calls; pass the
+# canonical label through unchanged to build-git-wheels.sh below.
+#
+# `manylinux_2_36` matches Pi OS bookworm (Debian 12, glibc 2.36) — the
+# baseline declared in image/pi-gen-config/config. This is the highest
+# compatibility floor uv will use to pick wheels: every aarch64 wheel
+# tagged 2_36 or lower (which is essentially all of them on PyPI today)
+# is acceptable.
+case "$PLATFORM" in
+    linux_aarch64)  UV_PLATFORM=aarch64-manylinux_2_36 ;;
+    linux_x86_64)   UV_PLATFORM=x86_64-manylinux_2_36 ;;
+    *)              UV_PLATFORM=$PLATFORM ;;
+esac
+
+echo "manifest:    $MANIFEST"
+echo "python:      $PY"
+echo "platform:    $PLATFORM"
+echo "uv platform: $UV_PLATFORM"
+echo "output:      $OUT"
 
 rm -rf "$OUT"
 mkdir -p "$OUT"
@@ -39,7 +59,7 @@ mkdir -p "$OUT"
 #    extras) doesn't pull them.
 uv pip compile \
     --python-version "$PY" \
-    --python-platform "$PLATFORM" \
+    --python-platform "$UV_PLATFORM" \
     --generate-hashes \
     --extra debug \
     --output-file "$OUT/requirements.txt" \
@@ -48,7 +68,7 @@ uv pip compile \
 # 2. Download every wheel (or sdist if no wheel is available) to $OUT.
 uv pip download \
     --python-version "$PY" \
-    --python-platform "$PLATFORM" \
+    --python-platform "$UV_PLATFORM" \
     --require-hashes \
     --dest "$OUT" \
     -r "$OUT/requirements.txt"
