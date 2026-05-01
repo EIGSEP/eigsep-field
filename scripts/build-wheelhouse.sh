@@ -24,8 +24,9 @@ PLATFORM=${3:-$(python3 -c "import tomllib; print(tomllib.load(open('$MANIFEST',
 
 # `linux_aarch64` is our canonical platform label (used in workflow
 # matrix names, image tarball filenames, and build-git-wheels.sh's
-# docker target). `uv pip compile` / `uv pip download`, however, want a
-# Rust-target-triple form like `aarch64-manylinux_2_36` — they reject
+# docker target). `uv pip compile` / `uv pip download`, however, want
+# uv's custom platform format (a Rust-like hyphenated manylinux tag
+# like `aarch64-manylinux_2_36`) — it rejects standard PEP tags like
 # `linux_aarch64` outright. Translate just for the uv calls; pass the
 # canonical label through unchanged to build-git-wheels.sh below.
 #
