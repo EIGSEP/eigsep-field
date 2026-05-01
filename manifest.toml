@@ -88,9 +88,12 @@ version = "3.10.9"
 # ---- Firmware artifacts (not pip-installable; checksummed blobs) ----
 
 [firmware.pico]
-# Flashed to the Raspberry Pi Pico(s) via picotool.
+# Flashed to the Raspberry Pi Pico(s) via picotool. Asset name matches
+# upstream's build output (`build/pico_multi.uf2` from build.sh) — see
+# pico-firmware's release-please.yml job that attaches it to the tagged
+# Release. Stable across releases; provenance is enforced by sha256 below.
 version = "v3.1.0"
-asset   = "pico-firmware-v3.0.0.uf2"
+asset   = "pico_multi.uf2"
 source  = "https://github.com/EIGSEP/pico-firmware"
 tag     = "v3.1.0"
 sha256  = ""

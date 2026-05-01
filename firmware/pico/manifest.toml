@@ -2,10 +2,10 @@
 # top-level manifest.toml. Kept here for standalone inspection and to
 # carry build notes that don't belong in the release manifest.
 
-version = "v3.0.0"
-asset   = "pico-firmware-v3.0.0.uf2"
+version = "v3.1.0"
+asset   = "pico_multi.uf2"
 source  = "https://github.com/EIGSEP/pico-firmware"
-tag     = "v3.0.0"
+tag     = "v3.1.0"
 sha256  = ""
 
 # Notes:
