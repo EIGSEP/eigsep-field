@@ -159,7 +159,9 @@ jobs:
       - name: pytest services drift test (belt and suspenders)
         env:
           GH_TOKEN: ${{ github.token }}
+        # pytest-timeout is required because pyproject.toml's
+        # [tool.pytest.ini_options] passes --timeout=60 in addopts.
         run: |
           python -m pip install --upgrade pip
-          python -m pip install pytest
+          python -m pip install pytest pytest-timeout
           pytest -q tests/test_services_drift.py
