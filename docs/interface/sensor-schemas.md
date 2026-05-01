@@ -129,6 +129,63 @@ Shared schema object — every listed sensor uses exactly the same fields.
 | `distance_m` | `float` | float → mean of non-error survivors |
 
 
+### `motor`
+
+| Field | Type | Reduction |
+|---|---|---|
+| `sensor_name` | `str` | str → first if unanimous, else ``UNKNOWN`` |
+| `status` | `str` | str → first if unanimous, else ``UNKNOWN`` |
+| `app_id` | `int` | int → min of non-error survivors (expected invariant) |
+| `az_pos` | `float` | float → mean of non-error survivors |
+| `az_target_pos` | `float` | float → mean of non-error survivors |
+| `el_pos` | `float` | float → mean of non-error survivors |
+| `el_target_pos` | `float` | float → mean of non-error survivors |
+
+
+### `adc_stats`
+
+| Field | Type | Reduction |
+|---|---|---|
+| `sensor_name` | `str` | str → first if unanimous, else ``UNKNOWN`` |
+| `status` | `str` | str → first if unanimous, else ``UNKNOWN`` |
+| `input0_core0_mean` | `float` | float → mean of non-error survivors |
+| `input0_core0_power` | `float` | float → mean of non-error survivors |
+| `input0_core0_rms` | `float` | float → mean of non-error survivors |
+| `input0_core1_mean` | `float` | float → mean of non-error survivors |
+| `input0_core1_power` | `float` | float → mean of non-error survivors |
+| `input0_core1_rms` | `float` | float → mean of non-error survivors |
+| `input1_core0_mean` | `float` | float → mean of non-error survivors |
+| `input1_core0_power` | `float` | float → mean of non-error survivors |
+| `input1_core0_rms` | `float` | float → mean of non-error survivors |
+| `input1_core1_mean` | `float` | float → mean of non-error survivors |
+| `input1_core1_power` | `float` | float → mean of non-error survivors |
+| `input1_core1_rms` | `float` | float → mean of non-error survivors |
+| `input2_core0_mean` | `float` | float → mean of non-error survivors |
+| `input2_core0_power` | `float` | float → mean of non-error survivors |
+| `input2_core0_rms` | `float` | float → mean of non-error survivors |
+| `input2_core1_mean` | `float` | float → mean of non-error survivors |
+| `input2_core1_power` | `float` | float → mean of non-error survivors |
+| `input2_core1_rms` | `float` | float → mean of non-error survivors |
+| `input3_core0_mean` | `float` | float → mean of non-error survivors |
+| `input3_core0_power` | `float` | float → mean of non-error survivors |
+| `input3_core0_rms` | `float` | float → mean of non-error survivors |
+| `input3_core1_mean` | `float` | float → mean of non-error survivors |
+| `input3_core1_power` | `float` | float → mean of non-error survivors |
+| `input3_core1_rms` | `float` | float → mean of non-error survivors |
+| `input4_core0_mean` | `float` | float → mean of non-error survivors |
+| `input4_core0_power` | `float` | float → mean of non-error survivors |
+| `input4_core0_rms` | `float` | float → mean of non-error survivors |
+| `input4_core1_mean` | `float` | float → mean of non-error survivors |
+| `input4_core1_power` | `float` | float → mean of non-error survivors |
+| `input4_core1_rms` | `float` | float → mean of non-error survivors |
+| `input5_core0_mean` | `float` | float → mean of non-error survivors |
+| `input5_core0_power` | `float` | float → mean of non-error survivors |
+| `input5_core0_rms` | `float` | float → mean of non-error survivors |
+| `input5_core1_mean` | `float` | float → mean of non-error survivors |
+| `input5_core1_power` | `float` | float → mean of non-error survivors |
+| `input5_core1_rms` | `float` | float → mean of non-error survivors |
+
+
 ### VNA S11 header (`VNA_S11_HEADER_SCHEMA`)
 
 Published alongside each VNA measurement. `freqs` (numpy array) is validated separately from these scalar fields.

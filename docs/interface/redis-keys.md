@@ -40,6 +40,7 @@ Cross-package uniqueness is enforced at test time by
 
 | Constant | Value | Kind |
 |---|---|---|
+| `ADC_SNAPSHOT_STREAM` | `'stream:adc_snapshot'` | stream |
 | `CORR_CONFIG_KEY` | `'corr_config'` | singleton key |
 | `CORR_HEADER_KEY` | `'corr_header'` | singleton key |
 | `CORR_PAIRS_SET` | `'corr_pairs'` | set |
