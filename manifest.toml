@@ -152,7 +152,7 @@ activation  = "role"
 role        = "panda"
 source      = "https://github.com/EIGSEP/pico-firmware"
 # Must match [packages.picohost].tag — enforced by check-services-drift.
-tag         = "v3.0.0"
+tag         = "v3.1.0"
 source_path = "picohost/pico-manager.service"
 
 [services.cmtvna]
