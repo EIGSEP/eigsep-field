@@ -56,6 +56,32 @@ from `manifest.toml`. Change `manifest.toml`, then run
 4. If it ships a contract surface, add a permalink entry in
    `docs/interface/README.md`.
 
+## When adding a field-debug package
+
+`[debug.*]` entries are PyPI packages we want available on field Pis for
+interactive debugging (ipython, matplotlib, …) but explicitly NOT pulled
+in by `pip install eigsep-field` in CI/dev. They live behind the `debug`
+extra: the wheelhouse build (`scripts/build-wheelhouse.sh`) compiles
+with `--extra debug` so the offline image has them, while smoke tests
+and dev installs stay slim.
+
+To add one:
+
+1. Add `[debug.<name>]` to `manifest.toml` with `pypi` and `version`.
+2. The hatch hook (`scripts/hatch_manifest_hook.py`) auto-injects the
+   pin into the eigsep-field meta-package's `[debug]` extra at build
+   time — no pyproject.toml edit.
+3. `./scripts/refresh-lock.sh` to regenerate uv.lock and requirements.txt
+   (committed `requirements.txt` does NOT include `[debug]` — only the
+   wheelhouse copy does).
+4. `eigsep-field info`/`doctor` pick the entry up automatically.
+
+If the same package is already a transitive runtime dep (e.g. matplotlib
+via eigsep-vna), pinning it under `[debug.*]` is still useful as a
+belt-and-suspenders guarantee the field image keeps it even if the
+upstream sibling drops the dep. The version must stay reconcilable with
+the transitive resolve.
+
 ## When adding a hardware-only (off-PyPI) package
 
 `[hardware.*]` entries describe Python packages that aren't on PyPI and

@@ -72,6 +72,23 @@ def _cmd_info(_: argparse.Namespace) -> int:
             if status == "DRIFT":
                 any_drift = True
         print(f"{name:<24} {blessed:<12} {installed:<12} {status}")
+
+    # Field-debug packages (e.g. ipython). Only installed via the
+    # `[debug]` extra (wheelhouse uses --extra debug). MISSING is
+    # informational — debug isn't required for a healthy stack.
+    for name, entry in manifest.get("debug", {}).items():
+        pypi_name = entry["pypi"]
+        blessed = entry["version"]
+        try:
+            installed = version(pypi_name)
+        except PackageNotFoundError:
+            installed = "(not installed)"
+            status = "debug"
+        else:
+            status = "ok" if _versions_equal(installed, blessed) else "DRIFT"
+            if status == "DRIFT":
+                any_drift = True
+        print(f"{pypi_name:<24} {blessed:<12} {installed:<12} {status}")
     return 1 if any_drift else 0
 
 
@@ -169,6 +186,24 @@ def _check_packages(manifest: dict) -> tuple[list[str], list[str]]:
             )
         else:
             ok.append(f"{name}: {installed} (hardware)")
+
+    # Debug packages: missing is *not* a problem (the debug extra is
+    # opt-in), but a version mismatch is — it means the wheelhouse and
+    # the manifest disagree, and `eigsep-field info` would also show DRIFT.
+    for entry in manifest.get("debug", {}).values():
+        pypi_name = entry["pypi"]
+        blessed = entry["version"]
+        try:
+            installed = version(pypi_name)
+        except PackageNotFoundError:
+            ok.append(f"{pypi_name}: not installed (debug, blessed {blessed})")
+            continue
+        if not _versions_equal(installed, blessed):
+            problems.append(
+                f"{pypi_name}: installed {installed}, blessed {blessed}"
+            )
+        else:
+            ok.append(f"{pypi_name}: {installed} (debug)")
     return ok, problems
 
 

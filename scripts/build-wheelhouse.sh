@@ -33,10 +33,15 @@ mkdir -p "$OUT"
 # 1. Compile a fully-pinned requirements.txt for the target platform.
 #    pyproject.toml's [project.dependencies] is dynamically sourced from
 #    manifest.toml, so uv resolves the blessed versions automatically.
+#    --extra debug bakes the [debug.*] manifest entries (ipython,
+#    matplotlib) into the wheelhouse so the field Pi has REPL + plotting
+#    available offline, even though `pip install eigsep-field` (no
+#    extras) doesn't pull them.
 uv pip compile \
     --python-version "$PY" \
     --python-platform "$PLATFORM" \
     --generate-hashes \
+    --extra debug \
     --output-file "$OUT/requirements.txt" \
     pyproject.toml
 
