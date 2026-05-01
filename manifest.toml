@@ -64,6 +64,27 @@ version = "0.6.0"
 tag     = "v0.6.0"
 source  = "https://github.com/EIGSEP/casperfpga"
 
+# ---- Field-debug Python packages (PyPI, not part of the runtime stack).
+# Shipped in the wheelhouse via the `debug` extra so they're present on
+# field Pis with no internet, but NOT pulled by `pip install eigsep-field`
+# in CI/dev — that would bloat smoke runs and dev envs with REPL/plot
+# tooling nobody needs there. Operators get them via
+# `pip install eigsep-field[debug]` (or, in the field, automatically from
+# the wheelhouse, which is built with --extra debug). ----
+
+[debug.ipython]
+# Interactive REPL for poking at a running stack at the field site.
+pypi    = "ipython"
+version = "9.13.0"
+
+[debug.matplotlib]
+# Already pulled in transitively today via eigsep-vna; pinning here is
+# belt-and-suspenders so a future eigsep-vna release that drops the
+# matplotlib dep doesn't silently strip plotting from the field image.
+# Version must stay reconcilable with whatever eigsep-vna asks for.
+pypi    = "matplotlib"
+version = "3.10.9"
+
 # ---- Firmware artifacts (not pip-installable; checksummed blobs) ----
 
 [firmware.pico]

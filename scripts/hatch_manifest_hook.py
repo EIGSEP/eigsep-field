@@ -15,6 +15,17 @@ from hatchling.metadata.plugin.interface import MetadataHookInterface
 class ManifestHook(MetadataHookInterface):
     PLUGIN_NAME = "eigsep-field-manifest"
 
+    # CI/dev tooling: floating versions are fine here — these never ship
+    # to a Pi. Kept in code (not manifest.toml) because manifest.toml is
+    # for *blessed, pinned* artifacts.
+    DEV_EXTRAS = [
+        "ruff",
+        "pytest",
+        "pytest-cov",
+        "pytest-timeout",
+        "build",
+    ]
+
     def update(self, metadata: dict) -> None:
         root = Path(self.root)
         manifest = tomllib.loads((root / "manifest.toml").read_text())
@@ -27,3 +38,16 @@ class ManifestHook(MetadataHookInterface):
             version = entry["version"]
             deps.append(f"{name}=={version}")
         metadata["dependencies"] = deps
+
+        # PEP 621 forbids splitting a field across static and dynamic, so
+        # `dev` is set here too rather than in pyproject.toml. `debug` is
+        # populated from manifest.toml's [debug.*] table — those pins go
+        # to the field via the wheelhouse's --extra debug compile.
+        debug_extras = [
+            f"{e['pypi']}=={e['version']}"
+            for e in manifest.get("debug", {}).values()
+        ]
+        metadata["optional-dependencies"] = {
+            "dev": list(self.DEV_EXTRAS),
+            "debug": debug_extras,
+        }

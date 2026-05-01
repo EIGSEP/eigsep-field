@@ -16,16 +16,7 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
   "Topic :: Scientific/Engineering :: Astronomy",
 ]
-dynamic = ["version", "dependencies"]
-
-[project.optional-dependencies]
-dev = [
-  "ruff",
-  "pytest",
-  "pytest-cov",
-  "pytest-timeout",
-  "build",
-]
+dynamic = ["version", "dependencies", "optional-dependencies"]
 
 [project.scripts]
 eigsep-field = "eigsep_field.cli:main"
