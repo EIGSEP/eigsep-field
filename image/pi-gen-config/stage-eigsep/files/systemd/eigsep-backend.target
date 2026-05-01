@@ -1,5 +1,5 @@
 [Unit]
-Description=EIGSEP backend role (digital backend: SNAP + observer)
+Description=EIGSEP backend role (digital backend: SNAP + observe + observe-writer)
 Wants=redis-server.service eigsep-observe.service eigsep-observe-writer.service
 After=network-online.target
 

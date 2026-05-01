@@ -206,7 +206,7 @@ activation  = "role"
 role        = "backend"
 source      = "https://github.com/EIGSEP/eigsep_observing"
 # Must match [packages.eigsep_observing].tag — enforced by check-services-drift.
-tag         = "v1.1.0"
+tag         = "v2.0.0"
 source_path = "deploy/systemd/eigsep-observe.service"
 
 [services.eigsep_observe_writer]
@@ -219,7 +219,7 @@ activation  = "role"
 role        = "backend"
 source      = "https://github.com/EIGSEP/eigsep_observing"
 # Must match [packages.eigsep_observing].tag — enforced by check-services-drift.
-tag         = "v1.1.0"
+tag         = "v2.0.0"
 source_path = "deploy/systemd/eigsep-observe-writer.service"
 
 [services.eigsep_panda_target]
