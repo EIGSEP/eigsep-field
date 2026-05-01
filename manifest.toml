@@ -16,16 +16,16 @@ notes        = "docs/releases/2026.4.0.md"
 
 [packages.eigsep_redis]
 pypi    = "eigsep_redis"
-version = "2.1.0"
-tag     = "v2.1.0"
+version = "2.1.1"
+tag     = "v2.1.1"
 source  = "https://github.com/EIGSEP/eigsep_redis"
 # sha256 of the sdist on PyPI; populated by scripts/refresh-lock.sh
 sha256  = ""
 
 [packages.picohost]
 pypi    = "picohost"
-version = "3.0.0"
-tag     = "v3.0.0"
+version = "3.1.0"
+tag     = "v3.1.0"
 source  = "https://github.com/EIGSEP/pico-firmware"
 sha256  = ""
 
@@ -38,8 +38,8 @@ sha256  = ""
 
 [packages.eigsep_observing]
 pypi    = "eigsep_observing"
-version = "1.0.0"
-tag     = "v1.0.0"
+version = "2.0.0"
+tag     = "v2.0.0"
 source  = "https://github.com/EIGSEP/eigsep_observing"
 sha256  = ""
 
@@ -68,10 +68,10 @@ source  = "https://github.com/EIGSEP/casperfpga"
 
 [firmware.pico]
 # Flashed to the Raspberry Pi Pico(s) via picotool.
-version = "v3.0.0"
+version = "v3.1.0"
 asset   = "pico-firmware-v3.0.0.uf2"
 source  = "https://github.com/EIGSEP/pico-firmware"
-tag     = "v3.0.0"
+tag     = "v3.1.0"
 sha256  = ""
 
 [firmware.rfsoc_bitstream]

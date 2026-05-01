@@ -10,7 +10,11 @@ if ! command -v uv >/dev/null 2>&1; then
     exit 2
 fi
 
-uv lock
+# --refresh busts uv's source-build cache for the local project. The
+# hatch hook injects [project].dependencies from manifest.toml, but uv's
+# build cache isn't keyed on manifest.toml, so without --refresh a
+# manifest edit can resolve against stale dependency metadata.
+uv lock --refresh
 uv export --format requirements-txt --no-hashes \
     --output-file requirements.txt
 uv export --format requirements-txt --output-file requirements-hashed.txt
