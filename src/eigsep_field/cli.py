@@ -1,4 +1,5 @@
-"""eigsep-field CLI: info / verify / doctor / services / _apply-role.
+"""eigsep-field CLI: info / verify / doctor / services / patch / revert /
+capture / src / _apply-role.
 
 Intentionally does **not** import sibling packages at module import time.
 ``doctor`` must run even when the stack is broken.
@@ -15,6 +16,22 @@ from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
 from eigsep_field import load_manifest
+from eigsep_field._patch import (
+    CAPTURES_DIR,
+    all_siblings,
+    blessed_commit,
+    build_capture,
+    dirty_count,
+    editable_source,
+    git_head,
+    install_editable,
+    list_sibling_names,
+    require_root,
+    resolve_sibling,
+    restart_units,
+    revert_all,
+    revert_package,
+)
 from eigsep_field._services import (
     KNOWN_ROLES,
     ROLE_FILE,
@@ -23,6 +40,7 @@ from eigsep_field._services import (
     is_enabled,
     parse_role_file,
     services_for_role,
+    services_importing_package,
     systemctl,
 )
 
@@ -235,6 +253,38 @@ def _check_services(
     return ok, problems
 
 
+def _check_editable_drift(manifest: dict) -> list[str]:
+    """Advisory notes for siblings that are editable, drifted, or dirty.
+
+    These are operator-visible state changes (active hot-patches), not
+    failures — the field workflow expects siblings to go editable
+    temporarily, so this returns advisories that don't fail doctor.
+    """
+    notes: list[str] = []
+    for s in all_siblings(manifest):
+        if not s.src_path.exists():
+            continue
+        flags: list[str] = []
+        ed_src = editable_source(s.pypi_name)
+        if ed_src is not None:
+            flags.append(f"editable -> {ed_src}")
+        head = git_head(s.src_path)
+        base = blessed_commit(s.src_path)
+        if head and base and head != base:
+            flags.append(f"drifted blessed={base[:8]} head={head[:8]}")
+        n = dirty_count(s.src_path)
+        if n:
+            flags.append(f"dirty ({n} uncommitted)")
+        if not flags:
+            continue
+        line = f"{s.name}: " + "; ".join(flags)
+        units = services_importing_package(manifest, s.pypi_name)
+        if units:
+            line += f"  [services: {', '.join(units)}]"
+        notes.append(line)
+    return notes
+
+
 def _cmd_doctor(_: argparse.Namespace) -> int:
     manifest = load_manifest()
     role_cfg = parse_role_file(ROLE_FILE)
@@ -251,9 +301,12 @@ def _cmd_doctor(_: argparse.Namespace) -> int:
     fw_ok, fw_prob = _check_firmware(manifest)
     pkg_ok, pkg_prob = _check_packages(manifest)
     svc_ok, svc_prob = _check_services(manifest, role_cfg)
+    notes = _check_editable_drift(manifest)
 
     for line in fw_ok + pkg_ok + svc_ok:
         print(f"  ok   {line}")
+    for line in notes:
+        print(f"  note {line}")
     for line in fw_prob + pkg_prob + svc_prob:
         print(f"  FAIL {line}", file=sys.stderr)
 
@@ -316,6 +369,126 @@ def _cmd_services(args: argparse.Namespace) -> int:
             cmd.append("-f")
         return subprocess.run(cmd).returncode
     raise AssertionError(f"unhandled services action: {args.action}")
+
+
+def _unknown_sibling(manifest: dict, name: str) -> int:
+    names = sorted(list_sibling_names(manifest))
+    print(
+        f"unknown sibling {name!r}; known: {', '.join(names)}",
+        file=sys.stderr,
+    )
+    return 2
+
+
+def _cmd_patch(args: argparse.Namespace) -> int:
+    manifest = load_manifest()
+    sibling = resolve_sibling(manifest, args.name)
+    if sibling is None:
+        return _unknown_sibling(manifest, args.name)
+    if not (sibling.src_path / ".git").exists():
+        print(
+            f"no source tree at {sibling.src_path} (or no .git/)",
+            file=sys.stderr,
+        )
+        return 2
+    units = services_importing_package(manifest, sibling.pypi_name)
+    print(f"sibling: {sibling.name} -> {sibling.src_path}")
+    print(f"editable install: {sibling.pypi_name}")
+    if units:
+        print(f"will restart: {', '.join(units)}")
+    else:
+        print("no services to restart for this sibling")
+    if args.dry_run:
+        return 0
+    rc = require_root("patch")
+    if rc is not None:
+        return rc
+    rc = install_editable(sibling)
+    if rc != 0:
+        print("editable install failed", file=sys.stderr)
+        return rc
+    if args.no_restart or not units:
+        return 0
+    _, failed = restart_units(units)
+    return 1 if failed else 0
+
+
+def _cmd_revert(args: argparse.Namespace) -> int:
+    manifest = load_manifest()
+    if args.name and args.all:
+        print(
+            "--all and a sibling name are mutually exclusive",
+            file=sys.stderr,
+        )
+        return 2
+    rc = require_root("revert")
+    if rc is not None:
+        return rc
+
+    units: list[str] = []
+    if args.name:
+        sibling = resolve_sibling(manifest, args.name)
+        if sibling is None:
+            return _unknown_sibling(manifest, args.name)
+        rc = revert_package(sibling)
+        units = services_importing_package(manifest, sibling.pypi_name)
+    else:
+        rc = revert_all()
+        # `uv sync` reinstalls every wheel; restart only the sibling
+        # services this Pi's role actually runs.
+        role_cfg = parse_role_file(ROLE_FILE)
+        services = manifest.get("services", {})
+        for _, entry in services_for_role(
+            services, role_cfg.role, role_cfg.dhcp
+        ):
+            if entry.get("kind") == "sibling":
+                units.append(entry["unit"])
+    if rc != 0:
+        return rc
+    if args.no_restart or not units:
+        return 0
+    _, failed = restart_units(units)
+    return 1 if failed else 0
+
+
+def _cmd_capture(args: argparse.Namespace) -> int:
+    from datetime import datetime, timezone
+
+    manifest = load_manifest()
+    sibling = resolve_sibling(manifest, args.name)
+    if sibling is None:
+        return _unknown_sibling(manifest, args.name)
+    text = build_capture(sibling, manifest)
+    if text is None:
+        print(f"no changes to capture for {sibling.name}")
+        return 0
+    if args.out:
+        out = Path(args.out)
+    else:
+        ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        out = CAPTURES_DIR / f"{sibling.name}-{ts}.patch"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(text)
+    print(f"wrote {out}")
+    print(
+        f"  scp the .patch back to base, then `git apply` against {sibling.name}"
+    )
+    return 0
+
+
+def _cmd_src(args: argparse.Namespace) -> int:
+    manifest = load_manifest()
+    sibling = resolve_sibling(manifest, args.name)
+    if sibling is None:
+        return _unknown_sibling(manifest, args.name)
+    if not sibling.src_path.exists():
+        print(
+            f"no source tree at {sibling.src_path}",
+            file=sys.stderr,
+        )
+        return 2
+    print(sibling.src_path)
+    return 0
 
 
 def _write_role_file(role_cfg: RoleConfig) -> None:
@@ -489,6 +662,66 @@ def main(argv: list[str] | None = None) -> int:
         "doctor", help="check role, firmware, packages, services"
     ).set_defaults(func=_cmd_doctor)
     _add_services_parser(sub)
+
+    patch = sub.add_parser(
+        "patch",
+        help="install a sibling editable from /opt/eigsep/src (needs sudo)",
+    )
+    patch.set_defaults(func=_cmd_patch)
+    patch.add_argument("name", help="sibling TOML key (e.g. eigsep_observing)")
+    patch.add_argument(
+        "--no-restart",
+        action="store_true",
+        help="skip systemctl restart of importing units",
+    )
+    patch.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="print plan, do not modify the venv",
+    )
+
+    revert = sub.add_parser(
+        "revert",
+        help="restore a sibling (or all) to the blessed wheelhouse "
+        "(needs sudo)",
+    )
+    revert.set_defaults(func=_cmd_revert)
+    revert.add_argument(
+        "name",
+        nargs="?",
+        help="sibling TOML key; omit (or pass --all) for full uv sync",
+    )
+    revert.add_argument(
+        "--all",
+        action="store_true",
+        help="uv sync the whole venv to the lockfile",
+    )
+    revert.add_argument(
+        "--no-restart",
+        action="store_true",
+        help="skip systemctl restart of importing units",
+    )
+
+    capture = sub.add_parser(
+        "capture",
+        help="write a .patch from current sibling state for sneakernet",
+    )
+    capture.set_defaults(func=_cmd_capture)
+    capture.add_argument(
+        "name", help="sibling TOML key (e.g. eigsep_observing)"
+    )
+    capture.add_argument(
+        "--out",
+        default=None,
+        help="output path (default /opt/eigsep/captures/<name>-<ts>.patch)",
+    )
+
+    src = sub.add_parser(
+        "src",
+        help="print the path to a sibling's source tree",
+    )
+    src.set_defaults(func=_cmd_src)
+    src.add_argument("name", help="sibling TOML key (e.g. eigsep_observing)")
 
     # Hidden: invoked only by eigsep-first-boot.service.
     ar = sub.add_parser("_apply-role", help=argparse.SUPPRESS)

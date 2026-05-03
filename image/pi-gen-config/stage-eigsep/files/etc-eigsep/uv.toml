@@ -1,0 +1,12 @@
+# uv config for the field Pi.
+#
+# Belt-and-suspenders enforcement that uv never touches the network: the
+# Pi is offline, every wheel is in /opt/eigsep/wheels, and `eigsep-field
+# revert` calls `uv sync --frozen --offline` against the lockfile in
+# /opt/eigsep/src/eigsep-field/.
+#
+# Pointed to by UV_CONFIG_FILE in /etc/profile.d/eigsep.sh.
+
+offline    = true
+no-index   = true
+find-links = ["/opt/eigsep/wheels"]

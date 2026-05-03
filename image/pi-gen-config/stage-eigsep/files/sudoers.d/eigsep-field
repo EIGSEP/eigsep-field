@@ -1,0 +1,9 @@
+# Allow the operator user to run only the root-required eigsep-field
+# subcommands without a password.
+#
+# `eigsep-field patch` and `eigsep-field revert` mutate the system venv
+# at /opt/eigsep/venv (root-owned) and call `systemctl restart` on
+# sibling services — both need root. `info`, `doctor`, `services list`,
+# `capture`, and `src` do not require sudo and should NOT be run with it.
+eigsep ALL=(root) NOPASSWD: /usr/local/bin/eigsep-field patch
+eigsep ALL=(root) NOPASSWD: /usr/local/bin/eigsep-field revert

@@ -48,6 +48,33 @@ install -m 0644 files/dhcp/dhcpd.conf \
 install -m 0644 files/dhcp/isc-dhcp-server \
     "${ROOTFS_DIR}/etc/default/isc-dhcp-server"
 
+# uv config: pin uv to the on-disk wheelhouse and forbid any network
+# index lookups. eigsep-field revert calls `uv sync` against this.
+install -m 0644 files/etc-eigsep/uv.toml \
+    "${ROOTFS_DIR}/etc/eigsep/uv.toml"
+
+# Operator shell environment: activate /opt/eigsep/venv on every login
+# and point uv at it so `uv pip install -e` from a sibling source tree
+# Just Works without per-project .venvs.
+install -d "${ROOTFS_DIR}/etc/profile.d"
+install -m 0644 files/etc-profile-d/eigsep.sh \
+    "${ROOTFS_DIR}/etc/profile.d/eigsep.sh"
+
+# Sudoers drop-in: the operator can `sudo eigsep-field patch|revert`
+# without a password but only that binary.
+install -d -m 0755 "${ROOTFS_DIR}/etc/sudoers.d"
+install -m 0440 files/sudoers.d/eigsep-field \
+    "${ROOTFS_DIR}/etc/sudoers.d/eigsep-field"
+
+# Cheatsheet + MOTD. Substitute {{release}} from the staged manifest so
+# the on-disk copies are self-describing for whoever ssh's in.
+RELEASE_VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('files/etc-eigsep/manifest.toml','rb'))['release'])")
+install -m 0644 files/CHEATSHEET.md "${ROOTFS_DIR}/opt/eigsep/CHEATSHEET.md"
+install -m 0644 files/etc-eigsep/motd "${ROOTFS_DIR}/etc/motd"
+sed -i "s|{{release}}|${RELEASE_VERSION}|g" \
+    "${ROOTFS_DIR}/opt/eigsep/CHEATSHEET.md" \
+    "${ROOTFS_DIR}/etc/motd"
+
 on_chroot << 'EOF'
 set -e
 apt-get update
@@ -83,4 +110,15 @@ systemctl mask systemd-timesyncd.service || true
 # Role-scoped services are installed but left disabled; first boot's
 # eigsep-first-boot.service enables the matching subset.
 /opt/eigsep/venv/bin/python -m eigsep_field._image_install enable-always
+
+# Clone every [packages.*] / [hardware.*] tree (plus eigsep-field) into
+# /opt/eigsep/src/<name> at the manifest-pinned tag. Operator-owned so
+# `git checkout -b field-fix-XXX` works in the field. Needs network in
+# the chroot, which we have here (apt-get update succeeded above).
+install -d /opt/eigsep/src
+/opt/eigsep/venv/bin/python -m eigsep_field._image_install clone-sources
+
+# Field-capture output dir: operator-writable so `eigsep-field capture`
+# doesn't need sudo.
+install -d -m 0755 -o eigsep -g eigsep /opt/eigsep/captures
 EOF

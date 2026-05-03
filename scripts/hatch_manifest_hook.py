@@ -37,6 +37,13 @@ class ManifestHook(MetadataHookInterface):
             name = entry["pypi"]
             version = entry["version"]
             deps.append(f"{name}=={version}")
+        # [tooling.*] pins are required by eigsep-field's own commands
+        # (e.g. `revert` calls `uv sync`), so they live in the main
+        # dependency list — not behind an extra. Same shape as packages.
+        for entry in manifest.get("tooling", {}).values():
+            name = entry["pypi"]
+            version = entry["version"]
+            deps.append(f"{name}=={version}")
         metadata["dependencies"] = deps
 
         # PEP 621 forbids splitting a field across static and dynamic, so

@@ -92,3 +92,35 @@ def is_active(unit: str) -> bool:
 def is_enabled(unit: str) -> bool:
     rc, _ = systemctl("is-enabled", "--quiet", unit)
     return rc == 0
+
+
+def services_importing(services: dict, package_tag: str) -> list[str]:
+    """Return systemd unit names whose sibling tag matches ``package_tag``.
+
+    The manifest pins each ``kind="sibling"`` service entry to the same
+    tag as the owning package (enforced by ``check_services_drift.py``),
+    so equality of ``tag`` is the package→unit edge.
+    """
+    return [
+        entry["unit"]
+        for entry in services.values()
+        if entry.get("kind") == "sibling" and entry.get("tag") == package_tag
+    ]
+
+
+def services_importing_package(manifest: dict, pypi_name: str) -> list[str]:
+    """Return systemd unit names that import a given PyPI package.
+
+    Looks the package up in ``[packages.*]`` by ``pypi`` (not by the
+    TOML key, which is free-form) and finds sibling services pinned to
+    the same tag. Returns ``[]`` for packages with no service of their
+    own (e.g. eigsep_redis, pyvalon).
+    """
+    tag: str | None = None
+    for entry in manifest.get("packages", {}).values():
+        if entry.get("pypi") == pypi_name:
+            tag = entry.get("tag")
+            break
+    if tag is None:
+        return []
+    return services_importing(manifest.get("services", {}), tag)
