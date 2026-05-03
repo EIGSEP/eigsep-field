@@ -133,6 +133,24 @@ jobs:
       - name: pytest interface drift test (belt and suspenders)
         run: pytest -q tests/test_interface_docs.py
 
+  field-smoke:
+    # End-to-end exercise of the offline patch/revert workflow against a
+    # throwaway venv + slim wheelhouse. Catches regressions in the
+    # patch/revert path that unit tests can't: uv flag changes, --no-deps
+    # semantics, manifest -> sibling clone wiring. Runs on x86_64 GHA
+    # (the production wheelhouse is aarch64 and built separately by
+    # wheelhouse.yml); this job tests the *logic*, not the cross-build.
+    runs-on: ubuntu-latest
+    needs: [manifest]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - uses: astral-sh/setup-uv@v4
+      - name: Run simulate-field-pi.sh
+        run: ./scripts/simulate-field-pi.sh
+
   services-drift:
     # Each [services.*] entry with kind="sibling" in manifest.toml pins a
     # unit file from a sibling repo at a specific tag. This job fetches
