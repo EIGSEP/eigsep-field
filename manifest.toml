@@ -85,6 +85,21 @@ version = "9.13.0"
 pypi    = "matplotlib"
 version = "3.10.9"
 
+# ---- Field tooling (PyPI, runtime deps of the eigsep-field meta package).
+# Distinct from [debug.*] because these are required for the field
+# workflow itself (`eigsep-field revert` shells out to `uv sync`), not
+# optional REPL/plot extras. The hatch hook injects [tooling.*] into the
+# meta package's main `dependencies`, so `pip install eigsep-field` (no
+# extras) pulls them on every install — CI, dev, and field. ----
+
+[tooling.uv]
+# Required by `eigsep-field patch` / `eigsep-field revert` for editable
+# installs and offline `uv sync` against /opt/eigsep/wheels. The PyPI
+# `uv` package vendors the static binary, so it lands at
+# /opt/eigsep/venv/bin/uv with no extra build steps.
+pypi    = "uv"
+version = "0.10.4"
+
 # ---- Firmware artifacts (not pip-installable; checksummed blobs) ----
 
 [firmware.pico]

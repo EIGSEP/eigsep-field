@@ -1,0 +1,5 @@
+
+EIGSEP field node — release {{release}}
+Cheatsheet: cat /opt/eigsep/CHEATSHEET.md
+Diagnostics: eigsep-field doctor
+
