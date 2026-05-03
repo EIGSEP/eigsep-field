@@ -43,6 +43,11 @@ SYSTEMD_DIR = (
     / "systemd"
 )
 
+# Importable without `pip install .` — the script is invoked directly
+# from CI and dev shells. _services.py has no eigsep_field-internal deps.
+sys.path.insert(0, str(REPO_ROOT / "src"))
+from eigsep_field._services import peer_package_for_service  # noqa: E402
+
 # Fields we track for drift. Intentionally excluded:
 #   - Path-shaped fields (ExecStart full path, WorkingDirectory, Environment).
 #     The image rewrites these to /opt/eigsep/...
@@ -53,14 +58,6 @@ SYSTEMD_DIR = (
 TRACKED: dict[str, tuple[str, ...]] = {
     "Unit": ("After", "Wants", "Requires", "Before"),
     "Service": ("User", "Group", "Restart", "Type"),
-}
-
-# Package whose tag each sibling service's tag must equal.
-TAG_PEERS: dict[str, str] = {
-    "picomanager": "picohost",
-    "cmtvna": "eigsep-vna",
-    "eigsep_observe": "eigsep_observing",
-    "eigsep_observe_writer": "eigsep_observing",
 }
 
 
@@ -168,19 +165,17 @@ def _diff_canonical(upstream: dict, local: dict, name: str) -> list[str]:
 
 
 def _check_tag_alignment(manifest: dict, name: str, entry: dict) -> list[str]:
-    peer = TAG_PEERS.get(name)
+    peer = peer_package_for_service(manifest, entry)
     if peer is None:
-        return []
-    pkg = manifest.get("packages", {}).get(peer)
-    if pkg is None:
         return [
-            f"  {name}: manifest [services.{name}] has no peer package "
-            f"[packages.{peer}] to cross-check tag against"
+            f"  {name}: source {entry.get('source')!r} matches no "
+            f"[packages.*].source — cannot cross-check tag"
         ]
-    if pkg.get("tag") != entry.get("tag"):
+    peer_name, peer_entry = peer
+    if peer_entry.get("tag") != entry.get("tag"):
         return [
             f"  {name}: tag {entry.get('tag')!r} does not match "
-            f"[packages.{peer}].tag = {pkg.get('tag')!r}"
+            f"[packages.{peer_name}].tag = {peer_entry.get('tag')!r}"
         ]
     return []
 

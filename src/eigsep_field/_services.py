@@ -124,3 +124,24 @@ def services_importing_package(manifest: dict, pypi_name: str) -> list[str]:
     if tag is None:
         return []
     return services_importing(manifest.get("services", {}), tag)
+
+
+def peer_package_for_service(
+    manifest: dict, service_entry: dict
+) -> tuple[str, dict] | None:
+    """Return ``(name, entry)`` for the ``[packages.*]`` item that owns a
+    sibling service, or ``None`` if no peer is found.
+
+    Linked by the ``source`` URL: a ``kind="sibling"`` service entry and
+    its peer package point at the same upstream git repo. Independent of
+    ``tag`` — that's the field drift CI verifies *between* the two —
+    so this is safe to use as the source-of-truth lookup that the drift
+    checker compares against.
+    """
+    src = service_entry.get("source")
+    if not src:
+        return None
+    for name, entry in manifest.get("packages", {}).items():
+        if entry.get("source") == src:
+            return name, entry
+    return None

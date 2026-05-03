@@ -159,11 +159,27 @@ def dirty_count(src_path: Path) -> int | None:
 
 
 def require_root(action: str) -> int | None:
-    """Return an exit code if euid != 0; None otherwise."""
-    if os.geteuid() == 0:
+    """Return an exit code if VENV_PATH is not writable; None otherwise.
+
+    On a Pi, ``/opt/eigsep/venv`` is root-owned, so this check requires
+    the operator to run with sudo (the documented workflow). On a dev
+    box where ``VIRTUAL_ENV`` points at a user-owned venv, no sudo is
+    required — same UX as ``pip install`` against the same venv.
+    """
+    if not VENV_PATH.exists():
+        print(
+            f"`eigsep-field {action}` expected a venv at {VENV_PATH} but "
+            f"it does not exist. Set VIRTUAL_ENV to a real venv, or "
+            f"install via the field image which provisions "
+            f"/opt/eigsep/venv.",
+            file=sys.stderr,
+        )
+        return 2
+    if os.access(VENV_PATH, os.W_OK):
         return None
     print(
-        f"`eigsep-field {action}` writes to {VENV_PATH}; rerun with sudo:\n"
+        f"`eigsep-field {action}` writes to {VENV_PATH} but it is not "
+        f"writable by the current user; rerun with sudo:\n"
         f"    sudo eigsep-field {action} ...",
         file=sys.stderr,
     )
@@ -215,7 +231,6 @@ def revert_package(sibling: Sibling) -> int:
         "install",
         "--no-deps",
         "--reinstall",
-        "--force-reinstall",
         "--no-index",
         "--offline",
         "--find-links",
