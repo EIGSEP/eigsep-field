@@ -166,6 +166,15 @@ def require_root(action: str) -> int | None:
     box where ``VIRTUAL_ENV`` points at a user-owned venv, no sudo is
     required — same UX as ``pip install`` against the same venv.
     """
+    if not VENV_PATH.exists():
+        print(
+            f"`eigsep-field {action}` expected a venv at {VENV_PATH} but "
+            f"it does not exist. Set VIRTUAL_ENV to a real venv, or "
+            f"install via the field image which provisions "
+            f"/opt/eigsep/venv.",
+            file=sys.stderr,
+        )
+        return 2
     if os.access(VENV_PATH, os.W_OK):
         return None
     print(

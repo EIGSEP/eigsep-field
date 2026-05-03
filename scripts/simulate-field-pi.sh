@@ -7,8 +7,9 @@
 #
 # What it does, in order:
 #   1. uv venv into $TMP/venv
-#   2. uv pip compile + uv pip download to populate $TMP/wheels from PyPI
-#      (host arch — we exercise patch/revert *logic*, not cross-build)
+#   2. uv pip compile + pip download (from the seeded venv) to populate
+#      $TMP/wheels from PyPI (host arch — we exercise patch/revert
+#      *logic*, not cross-build)
 #   3. uv build the eigsep-field meta wheel into $TMP/wheels
 #   4. install everything into the venv with --no-index from the wheelhouse
 #   5. git clone the chosen sibling at its manifest tag into $TMP/src
@@ -27,8 +28,7 @@
 # What we assert is the editable-advisory text moving in/out of the
 # output as patch/revert flips the venv install mode.
 #
-# Network: needs PyPI access and (by default) github.com to clone the
-# sibling. Run with --offline to skip the clone step (useful for retries).
+# Network: needs PyPI access and github.com to clone the sibling.
 
 set -euo pipefail
 
@@ -103,11 +103,14 @@ echo "=== step 3: build eigsep-field meta wheel"
 uv build --wheel --quiet --out-dir "$WHEELS"
 
 echo "=== step 4: install into venv from $WHEELS (--no-index)"
-META_WHEEL=$(ls -1 "$WHEELS"/eigsep_field-*.whl | head -n 1)
-if [[ -z "$META_WHEEL" ]]; then
+shopt -s nullglob
+meta_wheels=("$WHEELS"/eigsep_field-*.whl)
+shopt -u nullglob
+if [[ ${#meta_wheels[@]} -eq 0 ]]; then
     echo "expected eigsep_field-*.whl in $WHEELS" >&2
     exit 1
 fi
+META_WHEEL="${meta_wheels[0]}"
 VIRTUAL_ENV="$VENV" UV_PROJECT_ENVIRONMENT="$VENV" \
     uv pip install \
         --quiet \
