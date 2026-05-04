@@ -114,7 +114,7 @@ uv pip compile \
 #    variants enumerated above.
 PIP_VENV=$(mktemp -d -t eigsep-wh-pip.XXXXXX)
 trap 'rm -rf "$PIP_VENV"' EXIT
-uv venv --seed --quiet "$PIP_VENV"
+uv venv --python "$PY" --seed --quiet "$PIP_VENV"
 "$PIP_VENV/bin/pip" download \
     --python-version "$PY" \
     "${PIP_PLATFORM_ARGS[@]}" \
