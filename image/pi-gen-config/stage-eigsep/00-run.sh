@@ -55,6 +55,13 @@ install -d "${ROOTFS_DIR}/etc/redis/redis.conf.d"
 install -m 0644 files/redis/eigsep.conf \
     "${ROOTFS_DIR}/etc/redis/redis.conf.d/eigsep.conf"
 
+# CMT VNA udev rules. Mirrors cmt_vna/scripts/install_vna_rules.sh at
+# the manifest-pinned tag; without it the cmtvna binary picks the
+# SN0916 mock device and returns all zeros on real hardware.
+install -d "${ROOTFS_DIR}/etc/udev/rules.d"
+install -m 0644 files/udev/usb-cmt-vna.rules \
+    "${ROOTFS_DIR}/etc/udev/rules.d/usb-cmt-vna.rules"
+
 # uv config: pin uv to the on-disk wheelhouse and forbid any network
 # index lookups. eigsep-field revert calls `uv sync` against this.
 install -m 0644 files/etc-eigsep/uv.toml \

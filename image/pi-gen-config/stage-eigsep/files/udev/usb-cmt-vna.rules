@@ -1,0 +1,10 @@
+# Image-layout copy of the rules written by
+# scripts/install_vna_rules.sh in the cmt_vna repo (pinned to the
+# [services.cmtvna].tag in manifest.toml). Without this, the cmtvna
+# binary falls back to the SN0916 mock device and returns all zeros
+# on real hardware. Drop-in only — udev re-reads /etc/udev/rules.d
+# at boot, so no in-chroot reload is needed.
+SUBSYSTEM=="usb", ATTRS{idVendor}=="2226", MODE="0666"
+SUBSYSTEM=="usb_device", ATTRS{idVendor}=="2226", MODE="0666"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="36bf", MODE="0666"
+SUBSYSTEM=="usb_device", ATTRS{idVendor}=="36bf", MODE="0666"
