@@ -28,7 +28,9 @@ PLATFORM=${3:-$(python3 -c "import tomllib; print(tomllib.load(open('$MANIFEST',
 # spellings of it:
 #
 # - `uv pip compile` (resolve) wants uv's hyphenated manylinux tag like
-#   `aarch64-manylinux_2_41` and rejects standard PEP tags outright.
+#   `aarch64-manylinux_2_40`, rejects standard PEP tags outright, and
+#   only accepts values from its built-in allowlist (currently topping
+#   out at `manylinux_2_40` as of uv 0.10.x).
 # - `pip download` (fetch) wants one or more PEP 425 platform tags via
 #   repeated `--platform` flags, and matches each exactly — so we have
 #   to enumerate the manylinux variants we accept rather than relying
@@ -36,16 +38,20 @@ PLATFORM=${3:-$(python3 -c "import tomllib; print(tomllib.load(open('$MANIFEST',
 #   astral-sh/uv#3163), and `simulate-field-pi.sh` takes the same
 #   approach for the same reason.
 #
-# `manylinux_2_41` matches Pi OS trixie (Debian 13, glibc 2.41) — the
-# baseline declared in image/pi-gen-config/config. Wheels tagged with
-# any manylinux profile up to 2_41 are ABI-compatible; we enumerate the
-# named profiles in active use on PyPI rather than every possible glibc
-# minor (no wheels are published at e.g. 2_25 or 2_37). The legacy
-# `manylinux2014` alias and the bare `linux_<arch>` tag are included
-# for completeness.
+# Pi OS trixie (Debian 13, glibc 2.41) is the baseline declared in
+# image/pi-gen-config/config. Manylinux is backward-compatible — wheels
+# tagged for any glibc <= 2.41 install fine on trixie — so resolving
+# against `manylinux_2_40` (uv's current ceiling) is safe; we just lose
+# access to any 2_41-only wheels during resolve, of which none exist on
+# PyPI yet. PIP_PLATFORMS still lists `manylinux_2_41_<arch>` so the
+# downloader will pick up such a wheel if one appears before we bump uv.
+# We enumerate the manylinux profiles in active use on PyPI rather than
+# every possible glibc minor (no wheels are published at e.g. 2_25 or
+# 2_37). The legacy `manylinux2014` alias and the bare `linux_<arch>`
+# tag are included for completeness.
 case "$PLATFORM" in
     linux_aarch64)
-        UV_PLATFORM=aarch64-manylinux_2_41
+        UV_PLATFORM=aarch64-manylinux_2_40
         PIP_PLATFORMS=(
             linux_aarch64
             manylinux2014_aarch64
@@ -61,7 +67,7 @@ case "$PLATFORM" in
         )
         ;;
     linux_x86_64)
-        UV_PLATFORM=x86_64-manylinux_2_41
+        UV_PLATFORM=x86_64-manylinux_2_40
         PIP_PLATFORMS=(
             linux_x86_64
             manylinux2014_x86_64
