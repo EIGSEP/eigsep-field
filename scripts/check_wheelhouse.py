@@ -1,7 +1,9 @@
 """Verify a built wheelhouse contains every EIGSEP package at the manifest version.
 
-Run after the wheelhouse download step. Fails non-zero if any EIGSEP
-package is missing or the version on disk does not match manifest.toml.
+Run after the full wheelhouse has been assembled, including the later-added
+hardware wheels and the ``eigsep-field`` meta wheel. Fails non-zero if any
+required package is missing or the version on disk does not match
+manifest.toml.
 """
 
 from __future__ import annotations
