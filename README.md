@@ -42,7 +42,7 @@ links to those sources rather than restating them.
 ## Quickstart (dev host)
 
 ```bash
-uv venv --python 3.11
+uv venv --python 3.13
 uv pip install -e '.[dev]'
 
 # Regenerate lockfile + exported requirements after editing manifest.toml
@@ -52,8 +52,8 @@ uv pip install -e '.[dev]'
 ./scripts/build-wheelhouse.sh
 
 # Run CLI
-eigsep-field info
-eigsep-field doctor
+uv run eigsep-field info
+uv run eigsep-field doctor
 ```
 
 Pip-only equivalent:
