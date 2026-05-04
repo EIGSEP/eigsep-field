@@ -34,6 +34,7 @@ body:
         - label: CI green on PR (lint, manifest, lock-drift, smoke, contract)
         - label: Release PR merged to `main`
         - label: Tag cut from the merge commit (`git tag -a vYYYY.MM.P -m "release YYYY.MM.P" && git push origin vYYYY.MM.P`)
+        - label: Confirmed `IMAGE_FIRST_USER_PASS` repo secret is set (Settings → Secrets and variables → Actions); rotate if anyone has left the project since the last release
         - label: `wheelhouse.yml` + `image.yml` succeeded on the tag
         - label: Image verified in qemu / on a test Pi
         - label: `sync-downstream.yml` notifications filed in siblings

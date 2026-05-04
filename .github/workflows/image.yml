@@ -48,9 +48,34 @@ jobs:
       - name: Clone pi-gen
         run: git clone --depth=1 --branch arm64 https://github.com/RPi-Distro/pi-gen.git /tmp/pi-gen
       - name: Layer stage-eigsep into pi-gen
+        env:
+          # The `eigsep` user's login password. Stored as a repo secret so it
+          # isn't checked in. Rotate via the repo's Actions secrets settings.
+          # Required: an unset secret would let pi-gen fall back to the public
+          # default "raspberry", which is never acceptable for a Release-
+          # published image — see image/README.md.
+          FIRST_USER_PASS: ${{ secrets.IMAGE_FIRST_USER_PASS }}
         run: |
+          if [ -z "${FIRST_USER_PASS:-}" ]; then
+              echo "::error::IMAGE_FIRST_USER_PASS secret is not set."
+              echo "Set it at https://github.com/${GITHUB_REPOSITORY}/settings/secrets/actions" \
+                  "before re-running. The image must not ship with pi-gen's" \
+                  "default 'raspberry' password." >&2
+              exit 1
+          fi
+          case "${FIRST_USER_PASS}" in
+              *$'\n'*|*$'\r'*)
+                  echo "::error::IMAGE_FIRST_USER_PASS must not contain newline or carriage return characters." >&2
+                  exit 1
+                  ;;
+          esac
           cp -r image/pi-gen-config/stage-eigsep /tmp/pi-gen/stage-eigsep
           cp image/pi-gen-config/config /tmp/pi-gen/config
+          # pi-gen sources `config` as shell. Quote with shlex so a password
+          # containing spaces/quotes/`$` survives intact. Reject embedded
+          # newlines/CR first so the assignment stays single-line.
+          python3 -c 'import os, shlex; print(f"FIRST_USER_PASS={shlex.quote(os.environ[\"FIRST_USER_PASS\"])}")' \
+              >> /tmp/pi-gen/config
       - name: Build image
         working-directory: /tmp/pi-gen
         run: sudo ./build.sh

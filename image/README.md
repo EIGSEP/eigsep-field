@@ -20,6 +20,35 @@ tagged manifest version.
     - `etc-eigsep/manifest.toml` — copy of the blessed manifest.
     - `systemd/*.service` + `systemd/eigsep.target`.
 
+## Login credentials
+
+The image creates a single user, `eigsep`. Its password is set at build
+time from the **`IMAGE_FIRST_USER_PASS`** repo secret (see
+`.github/workflows/image.yml`'s "Layer stage-eigsep into pi-gen" step).
+
+- To **rotate** or look up the secret: repo Settings → Secrets and
+  variables → Actions → `IMAGE_FIRST_USER_PASS`. GitHub stores secrets
+  write-only — you can overwrite the value or delete it, but you cannot
+  read it back through the UI. Whoever set it last is the only person
+  who knows the value; if that's lost, rotate.
+- The CI workflow **fails fast** if the secret is unset, so a missing
+  rotation never silently ships pi-gen's default `raspberry`.
+- For a **manual local build** you must export `FIRST_USER_PASS`
+  yourself before invoking pi-gen — the local build path doesn't read
+  the GitHub secret.
+
+## Redis on the field LAN
+
+The image ships a Redis override at
+`/etc/redis/redis.conf.d/eigsep.conf` that binds Redis to all
+interfaces (`bind 0.0.0.0 -::`) and disables `protected-mode`. This is
+required because the writer (`eigsep-observe`) reads from the panda Pi
+and the SNAP-host Pi simultaneously, and is also what lets an operator
+laptop plug into the field switch and run a live plotter or a parallel
+writer. It is safe because the field LAN (10.10.10.0/24) is physically
+isolated with no internet uplink. Do **not** copy this config to a Pi
+on a public network without adding `requirepass` first.
+
 ## Build locally
 
 Requires linux with root (for `losetup`/`mount`) or a VM. See
