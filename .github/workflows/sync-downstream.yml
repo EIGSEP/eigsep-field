@@ -42,7 +42,7 @@ jobs:
           repositories: |
             eigsep_redis
             pico-firmware
-            cmt_vna
+            CMT-VNA
             eigsep_observing
             pyvalon
 
@@ -69,7 +69,7 @@ jobs:
           repo_map = {
               "eigsep_redis": "eigsep_redis",
               "pico-firmware": "picohost",
-              "cmt_vna": "eigsep-vna",
+              "CMT-VNA": "eigsep-vna",
               "eigsep_observing": "eigsep_observing",
               "pyvalon": "pyvalon",
           }

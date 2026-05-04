@@ -21,19 +21,38 @@ jobs:
               quilt parted qemu-user-static debootstrap zerofree \
               zip dosfstools libarchive-tools libcap2-bin grep \
               rsync xz-utils file git curl bc qemu-utils kpartx
-      - name: Wait for wheelhouse asset, then download
+      - name: Wait for wheelhouse run, then download asset
+        # Poll the wheelhouse run for this tag's commit so we fail fast if
+        # it failed, rather than blind-polling 15 min for an asset that
+        # will never appear.
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="${GITHUB_REF#refs/tags/}"
+          SHA="${GITHUB_SHA}"
+          status=
+          conclusion=
           for i in {1..30}; do
-              if gh release view "$TAG" --repo "${GITHUB_REPOSITORY}" \
-                  --json assets --jq '.assets[].name' \
-                  | grep -q wheels-linux_aarch64.tar.xz; then
-                  break
+              line=$(gh run list \
+                  --workflow=wheelhouse.yml --commit="$SHA" --limit 1 \
+                  --json status,conclusion \
+                  --jq 'if length == 0 then "missing|" else .[0] | "\(.status)|\(.conclusion // "")" end')
+              status="${line%%|*}"
+              conclusion="${line##*|}"
+              echo "wheelhouse: status='$status' conclusion='$conclusion' (attempt $i/30)"
+              if [ "$status" = "completed" ]; then
+                  if [ "$conclusion" = "success" ]; then
+                      break
+                  fi
+                  echo "::error::wheelhouse concluded '$conclusion'; aborting image build"
+                  exit 1
               fi
               sleep 30
           done
+          if [ "$status" != "completed" ] || [ "$conclusion" != "success" ]; then
+              echo "::error::Timed out waiting for wheelhouse to complete"
+              exit 1
+          fi
           mkdir -p image/pi-gen-config/stage-eigsep/files/wheels
           gh release download "$TAG" --pattern 'wheels-*.tar.xz' \
               --dir /tmp/wheels
