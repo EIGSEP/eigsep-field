@@ -48,6 +48,13 @@ install -m 0644 files/dhcp/dhcpd.conf \
 install -m 0644 files/dhcp/isc-dhcp-server \
     "${ROOTFS_DIR}/etc/default/isc-dhcp-server"
 
+# Field-LAN Redis overrides. Pulled in by an include line appended to
+# /etc/redis/redis.conf below; see the snippet's header for the
+# rationale (cross-Pi access on a physically-isolated private LAN).
+install -d "${ROOTFS_DIR}/etc/redis/redis.conf.d"
+install -m 0644 files/redis/eigsep.conf \
+    "${ROOTFS_DIR}/etc/redis/redis.conf.d/eigsep.conf"
+
 # uv config: pin uv to the on-disk wheelhouse and forbid any network
 # index lookups. eigsep-field revert calls `uv sync` against this.
 install -m 0644 files/etc-eigsep/uv.toml \
@@ -86,6 +93,18 @@ apt-get install -y --no-install-recommends \
     picotool \
     xvfb \
     git curl
+
+# Pull our overrides into the Debian-shipped redis.conf. Appended at the
+# end so the directives in eigsep.conf override the stock loopback-only
+# bind and protected-mode yes. The snippet itself was staged into the
+# rootfs above (out of chroot, where files/ is visible).
+if ! grep -qF "redis.conf.d/eigsep.conf" /etc/redis/redis.conf; then
+    {
+        echo ""
+        echo "# EIGSEP field overrides — see /etc/redis/redis.conf.d/eigsep.conf"
+        echo "include /etc/redis/redis.conf.d/eigsep.conf"
+    } >> /etc/redis/redis.conf
+fi
 
 python3 -m venv /opt/eigsep/venv
 /opt/eigsep/venv/bin/pip install --no-index \

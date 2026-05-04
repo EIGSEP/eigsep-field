@@ -4,7 +4,8 @@ RELEASE="bookworm"
 DEPLOY_COMPRESSION=xz
 ENABLE_SSH=1
 FIRST_USER_NAME="eigsep"
-# FIRST_USER_PASS is deliberately not set — pi-gen will use the default
-# "raspberry" unless overridden in a local .env. Change this before
-# any production deploy.
+# FIRST_USER_PASS is appended to this file at build time by
+# .github/workflows/image.yml from the IMAGE_FIRST_USER_PASS repo secret.
+# To rotate, edit the secret in the repo's Actions settings; to look it
+# up locally for a manual build, see image/README.md.
 STAGE_LIST="stage0 stage1 stage2 stage-eigsep"
