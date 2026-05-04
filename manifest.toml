@@ -8,7 +8,7 @@
 # uv.lock, requirements.txt, and requirements-hashed.txt.
 
 release      = "2026.4.0"
-python       = "3.11"
+python       = "3.13"
 released_at  = "2026-04-21"
 notes        = "docs/releases/2026.4.0.md"
 
@@ -38,8 +38,8 @@ sha256  = ""
 
 [packages.eigsep_observing]
 pypi    = "eigsep_observing"
-version = "2.0.0"
-tag     = "v2.0.0"
+version = "2.0.1"
+tag     = "v2.0.1"
 source  = "https://github.com/EIGSEP/eigsep_observing"
 sha256  = ""
 
@@ -57,11 +57,9 @@ sha256  = ""
 # installs (CI, dev) should not pull them from git. ----
 
 [hardware.casperfpga]
-# SNAP board driver (CASPER collaboration). Our fork adds the I2C helpers
-# needed for EIGSEP. eigsep_observing lazy-imports it (fpga.py, blocks.py)
-# so only the ground computer requires it at runtime.
-version = "0.6.0"
-tag     = "v0.6.0"
+# SNAP board driver (CASPER collaboration).
+version = "0.7.1"
+tag     = "v0.7.1"
 source  = "https://github.com/EIGSEP/casperfpga"
 
 # ---- Field-debug Python packages (PyPI, not part of the runtime stack).
@@ -221,7 +219,7 @@ activation  = "role"
 role        = "backend"
 source      = "https://github.com/EIGSEP/eigsep_observing"
 # Must match [packages.eigsep_observing].tag — enforced by check-services-drift.
-tag         = "v2.0.0"
+tag         = "v2.0.1"
 source_path = "deploy/systemd/eigsep-observe.service"
 
 [services.eigsep_observe_writer]
@@ -234,7 +232,7 @@ activation  = "role"
 role        = "backend"
 source      = "https://github.com/EIGSEP/eigsep_observing"
 # Must match [packages.eigsep_observing].tag — enforced by check-services-drift.
-tag         = "v2.0.0"
+tag         = "v2.0.1"
 source_path = "deploy/systemd/eigsep-observe-writer.service"
 
 [services.eigsep_panda_target]

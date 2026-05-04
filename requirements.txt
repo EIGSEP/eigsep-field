@@ -13,7 +13,7 @@ contourpy==1.3.3
     # via matplotlib
 cycler==0.12.1
     # via matplotlib
-eigsep-observing==2.0.0
+eigsep-observing==2.0.1
     # via eigsep-field
 eigsep-redis==2.1.1
     # via
