@@ -52,7 +52,7 @@ jobs:
       - uses: actions/setup-python@v6
         if: steps.guard.outputs.go == 'true'
         with:
-          python-version: "3.11"
+          python-version: "3.13"
 
       - name: File informational issue in each sibling repo
         if: steps.guard.outputs.go == 'true'
