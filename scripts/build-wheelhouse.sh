@@ -28,7 +28,7 @@ PLATFORM=${3:-$(python3 -c "import tomllib; print(tomllib.load(open('$MANIFEST',
 # spellings of it:
 #
 # - `uv pip compile` (resolve) wants uv's hyphenated manylinux tag like
-#   `aarch64-manylinux_2_36` and rejects standard PEP tags outright.
+#   `aarch64-manylinux_2_41` and rejects standard PEP tags outright.
 # - `pip download` (fetch) wants one or more PEP 425 platform tags via
 #   repeated `--platform` flags, and matches each exactly — so we have
 #   to enumerate the manylinux variants we accept rather than relying
@@ -36,14 +36,16 @@ PLATFORM=${3:-$(python3 -c "import tomllib; print(tomllib.load(open('$MANIFEST',
 #   astral-sh/uv#3163), and `simulate-field-pi.sh` takes the same
 #   approach for the same reason.
 #
-# `manylinux_2_36` matches Pi OS bookworm (Debian 12, glibc 2.36) — the
-# baseline declared in image/pi-gen-config/config. Every wheel tagged
-# 2_36 or older is ABI-compatible; we list them explicitly so pip
-# accepts them all, and include the legacy `manylinux2014` alias plus
-# the bare `linux_<arch>` tag for completeness.
+# `manylinux_2_41` matches Pi OS trixie (Debian 13, glibc 2.41) — the
+# baseline declared in image/pi-gen-config/config. Wheels tagged with
+# any manylinux profile up to 2_41 are ABI-compatible; we enumerate the
+# named profiles in active use on PyPI rather than every possible glibc
+# minor (no wheels are published at e.g. 2_25 or 2_37). The legacy
+# `manylinux2014` alias and the bare `linux_<arch>` tag are included
+# for completeness.
 case "$PLATFORM" in
     linux_aarch64)
-        UV_PLATFORM=aarch64-manylinux_2_36
+        UV_PLATFORM=aarch64-manylinux_2_41
         PIP_PLATFORMS=(
             linux_aarch64
             manylinux2014_aarch64
@@ -52,10 +54,14 @@ case "$PLATFORM" in
             manylinux_2_31_aarch64
             manylinux_2_34_aarch64
             manylinux_2_36_aarch64
+            manylinux_2_38_aarch64
+            manylinux_2_39_aarch64
+            manylinux_2_40_aarch64
+            manylinux_2_41_aarch64
         )
         ;;
     linux_x86_64)
-        UV_PLATFORM=x86_64-manylinux_2_36
+        UV_PLATFORM=x86_64-manylinux_2_41
         PIP_PLATFORMS=(
             linux_x86_64
             manylinux2014_x86_64
@@ -64,6 +70,10 @@ case "$PLATFORM" in
             manylinux_2_31_x86_64
             manylinux_2_34_x86_64
             manylinux_2_36_x86_64
+            manylinux_2_38_x86_64
+            manylinux_2_39_x86_64
+            manylinux_2_40_x86_64
+            manylinux_2_41_x86_64
         )
         ;;
     *)

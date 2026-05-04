@@ -133,17 +133,17 @@ asset = "eigsep-field-2026.4.0.img.tar.xz"
 [system]
 # Debian package version of redis-server installed by pi-gen. eigsep_redis
 # is the code contract; this pins the server.
-redis_server_apt = "7:7.0.15-1"
+redis_server_apt = "5:8.0.2-3+deb13u1"
 # Serves DHCP on the private LAN; exactly one Pi per LAN enables it (see
 # [services.isc_dhcp]). Config is baked into the image from
 # image/pi-gen-config/stage-eigsep/files/dhcp/.
-isc_dhcp_server_apt = "4.4.3-P1-2"
+isc_dhcp_server_apt = "4.4.3-P1-8"
 # chrony disciplines time on every Pi; see [services.chrony]. The
 # dhcp-master Pi is the LAN time server (uses the operator laptop at
 # 10.10.10.2 as upstream when present); other Pis sync from the
 # dhcp-master at 10.10.10.1. Per-role chrony.conf snippet is staged to
 # /etc/eigsep/chrony/ and symlinked at first boot by _cmd_apply_role.
-chrony_apt = "4.3-2+deb12u1"
+chrony_apt = "4.6.1-3+deb13u1"
 # Target platform for the wheelhouse. Field deployment is 64-bit
 # Raspberry Pi OS on a mixed Pi 4 (panda) / Pi 5 (backend) fleet; both
 # are aarch64, so a single wheelhouse serves both.
