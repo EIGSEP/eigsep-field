@@ -1,7 +1,7 @@
 """Verify a built wheelhouse contains every EIGSEP package at the manifest version.
 
-Run after `uv pip download`. Fails non-zero if any EIGSEP package is
-missing or the version on disk does not match manifest.toml.
+Run after the wheelhouse download step. Fails non-zero if any EIGSEP
+package is missing or the version on disk does not match manifest.toml.
 """
 
 from __future__ import annotations

@@ -24,22 +24,58 @@ PLATFORM=${3:-$(python3 -c "import tomllib; print(tomllib.load(open('$MANIFEST',
 
 # `linux_aarch64` is our canonical platform label (used in workflow
 # matrix names, image tarball filenames, and build-git-wheels.sh's
-# docker target). `uv pip compile` / `uv pip download`, however, want
-# uv's custom platform format (a Rust-like hyphenated manylinux tag
-# like `aarch64-manylinux_2_36`) — it rejects standard PEP tags like
-# `linux_aarch64` outright. Translate just for the uv calls; pass the
-# canonical label through unchanged to build-git-wheels.sh below.
+# docker target). The two cross-platform tools we drive want different
+# spellings of it:
+#
+# - `uv pip compile` (resolve) wants uv's hyphenated manylinux tag like
+#   `aarch64-manylinux_2_36` and rejects standard PEP tags outright.
+# - `pip download` (fetch) wants one or more PEP 425 platform tags via
+#   repeated `--platform` flags, and matches each exactly — so we have
+#   to enumerate the manylinux variants we accept rather than relying
+#   on a single floor. uv has no `pip download` subcommand (see
+#   astral-sh/uv#3163), and `simulate-field-pi.sh` takes the same
+#   approach for the same reason.
 #
 # `manylinux_2_36` matches Pi OS bookworm (Debian 12, glibc 2.36) — the
-# baseline declared in image/pi-gen-config/config. This is the highest
-# compatibility floor uv will use to pick wheels: every aarch64 wheel
-# tagged 2_36 or lower (which is essentially all of them on PyPI today)
-# is acceptable.
+# baseline declared in image/pi-gen-config/config. Every wheel tagged
+# 2_36 or older is ABI-compatible; we list them explicitly so pip
+# accepts them all, and include the legacy `manylinux2014` alias plus
+# the bare `linux_<arch>` tag for completeness.
 case "$PLATFORM" in
-    linux_aarch64)  UV_PLATFORM=aarch64-manylinux_2_36 ;;
-    linux_x86_64)   UV_PLATFORM=x86_64-manylinux_2_36 ;;
-    *)              UV_PLATFORM=$PLATFORM ;;
+    linux_aarch64)
+        UV_PLATFORM=aarch64-manylinux_2_36
+        PIP_PLATFORMS=(
+            linux_aarch64
+            manylinux2014_aarch64
+            manylinux_2_17_aarch64
+            manylinux_2_28_aarch64
+            manylinux_2_31_aarch64
+            manylinux_2_34_aarch64
+            manylinux_2_36_aarch64
+        )
+        ;;
+    linux_x86_64)
+        UV_PLATFORM=x86_64-manylinux_2_36
+        PIP_PLATFORMS=(
+            linux_x86_64
+            manylinux2014_x86_64
+            manylinux_2_17_x86_64
+            manylinux_2_28_x86_64
+            manylinux_2_31_x86_64
+            manylinux_2_34_x86_64
+            manylinux_2_36_x86_64
+        )
+        ;;
+    *)
+        UV_PLATFORM=$PLATFORM
+        PIP_PLATFORMS=("$PLATFORM")
+        ;;
 esac
+
+PIP_PLATFORM_ARGS=()
+for p in "${PIP_PLATFORMS[@]}"; do
+    PIP_PLATFORM_ARGS+=(--platform "$p")
+done
 
 echo "manifest:    $MANIFEST"
 echo "python:      $PY"
@@ -65,10 +101,24 @@ uv pip compile \
     --output-file "$OUT/requirements.txt" \
     pyproject.toml
 
-# 2. Download every wheel (or sdist if no wheel is available) to $OUT.
-uv pip download \
+# 2. Download every wheel to $OUT. We use a throwaway uv-seeded venv
+#    so we always have a fresh `pip` regardless of how the caller
+#    invoked the script — the README quickstart's `uv venv --python
+#    3.13` doesn't seed pip, so `python3 -m pip` from inside that
+#    venv would error with "No module named pip".
+#
+#    `--only-binary=:all:` is required when crossing platforms (pip
+#    can't safely build sdists for a different arch from this host),
+#    so every PyPI dep in the resolve must publish either a
+#    `py3-none-any` wheel or a wheel for one of the manylinux
+#    variants enumerated above.
+PIP_VENV=$(mktemp -d -t eigsep-wh-pip.XXXXXX)
+trap 'rm -rf "$PIP_VENV"' EXIT
+uv venv --seed --quiet "$PIP_VENV"
+"$PIP_VENV/bin/pip" download \
     --python-version "$PY" \
-    --python-platform "$UV_PLATFORM" \
+    "${PIP_PLATFORM_ARGS[@]}" \
+    --only-binary=:all: \
     --require-hashes \
     --dest "$OUT" \
     -r "$OUT/requirements.txt"
