@@ -37,10 +37,12 @@ PLATFORM=${3:-$(python3 -c "import tomllib; print(tomllib.load(open('$MANIFEST',
 #   approach for the same reason.
 #
 # `manylinux_2_41` matches Pi OS trixie (Debian 13, glibc 2.41) — the
-# baseline declared in image/pi-gen-config/config. Every wheel tagged
-# 2_41 or older is ABI-compatible; we list them explicitly so pip
-# accepts them all, and include the legacy `manylinux2014` alias plus
-# the bare `linux_<arch>` tag for completeness.
+# baseline declared in image/pi-gen-config/config. Wheels tagged with
+# any manylinux profile up to 2_41 are ABI-compatible; we enumerate the
+# named profiles in active use on PyPI rather than every possible glibc
+# minor (no wheels are published at e.g. 2_25 or 2_37). The legacy
+# `manylinux2014` alias and the bare `linux_<arch>` tag are included
+# for completeness.
 case "$PLATFORM" in
     linux_aarch64)
         UV_PLATFORM=aarch64-manylinux_2_41
