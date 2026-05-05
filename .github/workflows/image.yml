@@ -18,12 +18,17 @@ jobs:
         with:
           python-version: "3.13"
       - name: Install prerequisites
+        # qemu-user-binfmt is required by pi-gen's `depends` file even on
+        # native arm64. It is not exercised at runtime here (no chroot
+        # emulation needed) but pi-gen's startup check refuses to proceed
+        # without it.
         run: |
           sudo apt-get update
           sudo apt-get install -y \
               quilt parted arch-test debootstrap zerofree \
               zip dosfstools libarchive-tools libcap2-bin grep \
-              rsync xz-utils file git curl bc qemu-utils kpartx
+              rsync xz-utils file git curl bc qemu-utils kpartx \
+              qemu-user-binfmt
       - name: Wait for wheelhouse run, then download asset
         # Poll the wheelhouse run for this tag's commit so we fail fast if
         # it failed, rather than blind-polling 15 min for an asset that
