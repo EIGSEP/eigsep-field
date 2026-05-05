@@ -37,5 +37,4 @@ body:
         - label: Confirmed `IMAGE_FIRST_USER_PASS` repo secret is set (Settings → Secrets and variables → Actions); rotate if anyone has left the project since the last release
         - label: `wheelhouse.yml` + `image.yml` succeeded on the tag
         - label: Image verified in qemu / on a test Pi
-        - label: `sync-downstream.yml` notifications filed in siblings
         - label: PR against `EIGSEP/EIGSEP.github.io` bumping `docs/_data/eigsep_field.yml :: tag` to the new release tag
