@@ -119,8 +119,7 @@ jobs:
       - name: Collect artifacts
         run: |
           mkdir -p out
-          cp /tmp/pi-gen/deploy/*.img out/ || true
-          cp /tmp/pi-gen/deploy/*.img.xz out/ || true
+          cp /tmp/pi-gen/deploy/*.img.xz out/
           cd out
           for f in *.img.xz; do
               split -b 1800M "$f" "${f}.part."
