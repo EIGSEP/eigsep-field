@@ -352,9 +352,9 @@ packaging==26.2 \
     # via
     #   matplotlib
     #   plotly
-picohost==3.1.0 \
-    --hash=sha256:3b71b68e4a5b6f9f6a1f203e84093324a6b9a9b575a37ef218fe3a3ed6e48eef \
-    --hash=sha256:9c363170edac2c8663985cdc510fc8515b8e49ba654a9ad99b995dbfce7bcfbd
+picohost==3.1.1 \
+    --hash=sha256:06e5c9f95377c6e0925c2016a87b078098cf0c37895441b0d02ccf23f8ce50aa \
+    --hash=sha256:483a96dac1e9989824df0c3cbfa4d10e7516b7dfdc5aeb38b6e9462c55823e84
     # via
     #   eigsep-field
     #   eigsep-observing

@@ -24,8 +24,8 @@ sha256  = ""
 
 [packages.picohost]
 pypi    = "picohost"
-version = "3.1.0"
-tag     = "v3.1.0"
+version = "3.1.1"
+tag     = "v3.1.1"
 source  = "https://github.com/EIGSEP/pico-firmware"
 sha256  = ""
 
@@ -105,10 +105,10 @@ version = "0.10.4"
 # upstream's build output (`build/pico_multi.uf2` from build.sh) — see
 # pico-firmware's release-please.yml job that attaches it to the tagged
 # Release. Stable across releases; provenance is enforced by sha256 below.
-version = "v3.1.0"
+version = "v3.1.1"
 asset   = "pico_multi.uf2"
 source  = "https://github.com/EIGSEP/pico-firmware"
-tag     = "v3.1.0"
+tag     = "v3.1.1"
 sha256  = ""
 
 [firmware.rfsoc_bitstream]
@@ -189,7 +189,7 @@ activation  = "role"
 role        = "panda"
 source      = "https://github.com/EIGSEP/pico-firmware"
 # Must match [packages.picohost].tag — enforced by check-services-drift.
-tag         = "v3.1.0"
+tag         = "v3.1.1"
 source_path = "picohost/pico-manager.service"
 
 [services.cmtvna]

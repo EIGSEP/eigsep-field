@@ -55,7 +55,7 @@ packaging==26.2
     # via
     #   matplotlib
     #   plotly
-picohost==3.1.0
+picohost==3.1.1
     # via
     #   eigsep-field
     #   eigsep-observing
