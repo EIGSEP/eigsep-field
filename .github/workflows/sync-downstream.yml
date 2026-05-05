@@ -73,6 +73,7 @@ jobs:
               "eigsep_observing": "eigsep_observing",
               "pyvalon": "pyvalon",
           }
+          failures = []
           for repo, pkg in repo_map.items():
               version = m["packages"][pkg]["version"]
               title = f"eigsep-field {release}: your package pinned at {version}"
@@ -83,19 +84,36 @@ jobs:
               )
               # Ensure the cross-repo label exists; --force makes this
               # idempotent so re-runs and first-time runs both succeed.
-              subprocess.run([
-                  "gh", "label", "create", "eigsep-field-release",
-                  "--repo", f"EIGSEP/{repo}",
-                  "--color", "0E8A16",
-                  "--description",
-                  "Notification from an eigsep-field release",
-                  "--force",
-              ], check=True)
-              subprocess.run([
-                  "gh", "issue", "create",
-                  "--repo", f"EIGSEP/{repo}",
-                  "--title", title,
-                  "--body", body,
-                  "--label", "eigsep-field-release",
-              ], check=True)
+              # Skip the whole repo on any gh failure (e.g. issues disabled,
+              # auth scope missing) so one sibling can't sink the others —
+              # this is informational, not load-bearing.
+              try:
+                  subprocess.run([
+                      "gh", "label", "create", "eigsep-field-release",
+                      "--repo", f"EIGSEP/{repo}",
+                      "--color", "0E8A16",
+                      "--description",
+                      "Notification from an eigsep-field release",
+                      "--force",
+                  ], check=True)
+                  subprocess.run([
+                      "gh", "issue", "create",
+                      "--repo", f"EIGSEP/{repo}",
+                      "--title", title,
+                      "--body", body,
+                      "--label", "eigsep-field-release",
+                  ], check=True)
+              except subprocess.CalledProcessError as e:
+                  print(
+                      f"::warning::sync-downstream skipped EIGSEP/{repo}: "
+                      f"gh exited {e.returncode}",
+                      flush=True,
+                  )
+                  failures.append(repo)
+          if failures:
+              print(
+                  f"::notice::sync-downstream finished with skips: "
+                  f"{', '.join(failures)}",
+                  flush=True,
+              )
           EOF
