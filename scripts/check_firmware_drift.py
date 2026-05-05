@@ -52,7 +52,7 @@ def _match(
     """
     problems: list[str] = []
     matched: dict[str, tuple[Path, dict]] = {}
-    used: set[Path] = set()
+    claimed_by: dict[Path, str] = {}
     for top_key, top_data in top.items():
         sig = (top_data.get("source"), top_data.get("asset"))
         candidates = [
@@ -75,11 +75,21 @@ def _match(
                 f"mirrors ({paths}); (source, asset) must be unique"
             )
             continue
+        chosen_path, _ = candidates[0]
+        prior = claimed_by.get(chosen_path)
+        if prior is not None:
+            rel = chosen_path.relative_to(REPO_ROOT)
+            problems.append(
+                f"  [firmware.{prior}] and [firmware.{top_key}] both "
+                f"match {rel}; (source, asset) must be unique across "
+                f"[firmware.*]"
+            )
+            continue
         matched[top_key] = candidates[0]
-        used.add(candidates[0][0])
+        claimed_by[chosen_path] = top_key
 
     for path in local:
-        if path not in used:
+        if path not in claimed_by:
             rel = path.relative_to(REPO_ROOT)
             problems.append(
                 f"  {rel}: no matching [firmware.*] in top-level manifest.toml"
