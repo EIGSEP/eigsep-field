@@ -81,6 +81,16 @@ jobs:
                   f"This release pins `{pkg}=={version}` in the field stack.\n"
                   f"No action required unless you see producer-contract drift."
               )
+              # Ensure the cross-repo label exists; --force makes this
+              # idempotent so re-runs and first-time runs both succeed.
+              subprocess.run([
+                  "gh", "label", "create", "eigsep-field-release",
+                  "--repo", f"EIGSEP/{repo}",
+                  "--color", "0E8A16",
+                  "--description",
+                  "Notification from an eigsep-field release",
+                  "--force",
+              ], check=True)
               subprocess.run([
                   "gh", "issue", "create",
                   "--repo", f"EIGSEP/{repo}",
