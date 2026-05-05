@@ -4,10 +4,11 @@ RELEASE="trixie"
 DEPLOY_COMPRESSION=xz
 ENABLE_SSH=1
 FIRST_USER_NAME="eigsep"
-# FIRST_USER_PASS is appended to this file at build time by
-# .github/workflows/image.yml from the IMAGE_FIRST_USER_PASS repo secret.
-# To rotate, edit the secret in the repo's Actions settings. For a local
-# manual build, provide FIRST_USER_PASS explicitly (or rotate the secret
-# and use the new value); GitHub secrets cannot be retrieved locally.
+# FIRST_USER_PASS is prepended to this file at build time by
+# .github/workflows/image.yml from the IMAGE_FIRST_USER_PASS repo secret,
+# so the assignment lands ahead of the `:?` assertion below. To rotate,
+# edit the secret in the repo's Actions settings. For a local manual
+# build, provide FIRST_USER_PASS explicitly (or rotate the secret and
+# use the new value); GitHub secrets cannot be retrieved locally.
 : "${FIRST_USER_PASS:?FIRST_USER_PASS must be set explicitly for local/manual builds or injected by CI.}"
 STAGE_LIST="stage0 stage1 stage2 stage-eigsep"

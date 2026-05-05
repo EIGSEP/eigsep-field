@@ -92,10 +92,18 @@ jobs:
           cp image/pi-gen-config/config /tmp/pi-gen/config
           # pi-gen sources `config` as shell. Quote with shlex so a password
           # containing spaces/quotes/`$` survives intact. Reject embedded
-          # newlines/CR first so the assignment stays single-line.
-          python3 - >> /tmp/pi-gen/config <<'PY'
+          # newlines/CR first so the assignment stays single-line. Prepend
+          # rather than append so the assignment lands ahead of the `:?`
+          # safety assertion in `config`, which would otherwise fire on the
+          # still-unset variable when pi-gen sources the file top-to-bottom.
+          python3 - <<'PY'
           import os, shlex
-          print(f"FIRST_USER_PASS={shlex.quote(os.environ['FIRST_USER_PASS'])}")
+          path = '/tmp/pi-gen/config'
+          with open(path) as f:
+              existing = f.read()
+          with open(path, 'w') as f:
+              f.write(f"FIRST_USER_PASS={shlex.quote(os.environ['FIRST_USER_PASS'])}\n")
+              f.write(existing)
           PY
       - name: Build image
         working-directory: /tmp/pi-gen
