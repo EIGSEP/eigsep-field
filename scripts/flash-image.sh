@@ -4,14 +4,15 @@
 # The dd is intentionally NOT executed here -- review and run it yourself
 # against the correct /dev/sdX.
 #
-#   ./scripts/flash-image.sh <tag> [dest-dir]
+#   ./scripts/flash-image.sh [tag] [dest-dir]
 #
-#   <tag>      Release tag, e.g. v2026-5.0-rc1
+#   [tag]      Release tag, e.g. v2026-5.0-rc1. Defaults to
+#              manifest.toml [image].tag (the campaign-blessed image).
 #   [dest-dir] Where to drop the image. Defaults to ./out.
 #
-# Sibling of download-image.sh: that one reads the blessed [image] entry
-# from manifest.toml; this one is for rc cycles where the manifest has
-# not yet been bumped to the rc tag.
+# The asset filename is auto-discovered from the uploaded *.part.* files,
+# so this works regardless of pi-gen's date-stamp without needing a pinned
+# asset name in manifest.toml.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -20,8 +21,7 @@ TAG=${1:-}
 DEST=${2:-out}
 
 if [[ -z "$TAG" ]]; then
-    echo "usage: $0 <tag> [dest-dir]" >&2
-    exit 2
+    TAG=$(python3 -c "import tomllib; print(tomllib.load(open('manifest.toml','rb'))['image']['tag'])")
 fi
 
 mkdir -p "$DEST"

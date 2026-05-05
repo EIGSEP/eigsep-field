@@ -125,8 +125,7 @@ sha256  = ""
 # Release because the image is built from this manifest — chicken-and-egg).
 
 [image]
-tag   = "v2026.4.0"
-asset = "eigsep-field-2026.4.0.img.tar.xz"
+tag = "v2026.4.0"
 
 # ---- Out-of-band pins (system packages baked into the image) ----
 
