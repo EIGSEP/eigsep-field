@@ -15,12 +15,20 @@ Each Pi runs one role:
 
 ## 2. Flash the latest image
 
-`eigsep-field-<release>.img.tar.xz` from the release artifacts. The
-image is uniform across roles and across Pi 4 / Pi 5 (Raspberry Pi OS
-Bookworm 64-bit boots both); per-Pi state is set by
-`/boot/eigsep-role.conf`. Today panda runs on a Pi 4 and backend on a
-Pi 5, but role is decoupled from hardware — either role can run on
-either Pi.
+```
+./scripts/flash-image.sh                # uses manifest.toml [image].tag
+./scripts/flash-image.sh v2026-5.0-rc1  # or pin to a specific tag
+```
+
+This downloads the release's split image parts, reassembles them,
+verifies sha256, decompresses, and prints (does not run) the `dd`
+command. Run the printed `dd` after confirming the SD card device with
+`lsblk`.
+
+The image is uniform across roles and across Pi 4 / Pi 5; per-Pi state
+is set by `/boot/eigsep-role.conf`. Today panda runs on a Pi 4 and
+backend on a Pi 5, but role is decoupled from hardware — either role
+can run on either Pi.
 
 ## 3. Set the role on first boot
 
