@@ -7,7 +7,10 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    # Native arm64 runner: pi-gen's debootstrap/chroot run without qemu,
+    # avoiding the binfmt_misc fix-binary fight and the ~5x emulation
+    # slowdown. Free for public repos as of 2025-01.
+    runs-on: ubuntu-24.04-arm
     needs: []
     steps:
       - uses: actions/checkout@v6
@@ -17,15 +20,8 @@ jobs:
       - name: Install prerequisites
         run: |
           sudo apt-get update
-          # qemu-user satisfies pi-gen's dependencies_check (it scans for
-          # `qemu-arm` on PATH, provided by the dynamic package). qemu-user-
-          # static is what registers binfmt_misc with the F (fix-binary)
-          # flag, which is what debootstrap needs to run aarch64 binaries
-          # inside a chroot. The two `qemu-user-binfmt` and `qemu-user-
-          # static` Conflicts; `qemu-user` alone does not.
           sudo apt-get install -y \
-              quilt parted qemu-user qemu-user-static arch-test \
-              debootstrap zerofree \
+              quilt parted arch-test debootstrap zerofree \
               zip dosfstools libarchive-tools libcap2-bin grep \
               rsync xz-utils file git curl bc qemu-utils kpartx
       - name: Wait for wheelhouse run, then download asset
