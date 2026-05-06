@@ -137,10 +137,15 @@ jobs:
         # staged tree's history is self-contained and won't be polluted
         # by later mutations of the workspace. fetch-depth: 0 +
         # fetch-tags: true on the checkout above ensure full history
-        # and v-tags survive the clone.
+        # and v-tags survive the clone. The clone leaves origin pointing
+        # at the runner's workspace path; rewrite it to the GitHub URL
+        # so the on-image tree has a usable remote for the field-fix
+        # workflow (`git checkout -b field-fix-XXX && git push`).
         run: |
-          git clone --no-local "$GITHUB_WORKSPACE" \
-              image/pi-gen-config/stage-eigsep/00-eigsep-install/files/eigsep-field-src
+          STAGED=image/pi-gen-config/stage-eigsep/00-eigsep-install/files/eigsep-field-src
+          git clone --no-local "$GITHUB_WORKSPACE" "$STAGED"
+          git -C "$STAGED" remote set-url origin \
+              "https://github.com/${GITHUB_REPOSITORY}.git"
       - name: Clone pi-gen
         run: git clone --depth=1 --branch arm64 https://github.com/RPi-Distro/pi-gen.git /tmp/pi-gen
       - name: Layer stage-eigsep into pi-gen

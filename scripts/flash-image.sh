@@ -7,7 +7,7 @@
 #   ./scripts/flash-image.sh [tag] [dest-dir]
 #
 #   [tag]      Release tag, e.g. v2026-5.0-rc1. Defaults to
-#              manifest.toml [image].tag (the campaign-blessed image).
+#              v{manifest.release} (the campaign-blessed image).
 #   [dest-dir] Where to drop the image. Defaults to ./out.
 #
 # The asset filename is auto-discovered from the uploaded *.part.* files,
@@ -21,7 +21,7 @@ TAG=${1:-}
 DEST=${2:-out}
 
 if [[ -z "$TAG" ]]; then
-    TAG=$(python3 -c "import tomllib; print(tomllib.load(open('manifest.toml','rb'))['image']['tag'])")
+    TAG=$(python3 -c "import tomllib; print('v' + tomllib.load(open('manifest.toml','rb'))['release'])")
 fi
 
 mkdir -p "$DEST"
