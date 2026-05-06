@@ -27,6 +27,7 @@ SYSTEMD_DIR = (
     / "image"
     / "pi-gen-config"
     / "stage-eigsep"
+    / "00-eigsep-install"
     / "files"
     / "systemd"
 )
