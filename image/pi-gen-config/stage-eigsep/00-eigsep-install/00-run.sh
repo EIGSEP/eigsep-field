@@ -89,62 +89,20 @@ sed -i "s|{{release}}|${RELEASE_VERSION}|g" \
     "${ROOTFS_DIR}/opt/eigsep/CHEATSHEET.md" \
     "${ROOTFS_DIR}/etc/motd"
 
-on_chroot << 'EOF'
-set -e
-apt-get update
-apt-get install -y --no-install-recommends \
-    python3 python3-venv python3-pip \
-    redis-server \
-    isc-dhcp-server \
-    chrony \
-    picotool \
-    xvfb \
-    git curl
-
-# Pull our overrides into the Debian-shipped redis.conf. Appended at the
-# end so the directives in eigsep.conf override the stock loopback-only
-# bind and protected-mode yes. The snippet itself was staged into the
-# rootfs above (out of chroot, where files/ is visible).
-if ! grep -qF "redis.conf.d/eigsep.conf" /etc/redis/redis.conf; then
-    {
-        echo ""
-        echo "# EIGSEP field overrides — see /etc/redis/redis.conf.d/eigsep.conf"
-        echo "include /etc/redis/redis.conf.d/eigsep.conf"
-    } >> /etc/redis/redis.conf
-fi
-
-python3 -m venv /opt/eigsep/venv
-/opt/eigsep/venv/bin/pip install --no-index \
-    --find-links /opt/eigsep/wheels \
-    --require-hashes \
-    -r /opt/eigsep/wheels/requirements.txt \
-    eigsep-field
-
-ln -sf /opt/eigsep/venv/bin/eigsep-field /usr/local/bin/eigsep-field
-
-# Do not start isc-dhcp-server at image build time — only the one Pi
-# that's given `dhcp = true` in /boot/eigsep-role.conf should run it.
-systemctl disable isc-dhcp-server.service || true
-
-# Mask systemd-timesyncd so it can't fight chrony for the clock. The
-# chrony postinst usually masks it, but we mask explicitly to be robust
-# against pi-gen base image changes.
-systemctl disable systemd-timesyncd.service || true
-systemctl mask systemd-timesyncd.service || true
-
-# Enable every activation="always" service from manifest.toml.
-# Role-scoped services are installed but left disabled; first boot's
-# eigsep-first-boot.service enables the matching subset.
-/opt/eigsep/venv/bin/python -m eigsep_field._image_install enable-always
-
-# Clone every [packages.*] / [hardware.*] tree (plus eigsep-field) into
-# /opt/eigsep/src/<name> at the manifest-pinned tag. Operator-owned so
-# `git checkout -b field-fix-XXX` works in the field. Needs network in
-# the chroot, which we have here (apt-get update succeeded above).
-install -d /opt/eigsep/src
-/opt/eigsep/venv/bin/python -m eigsep_field._image_install clone-sources
-
-# Field-capture output dir: operator-writable so `eigsep-field capture`
-# doesn't need sudo.
-install -d -m 0755 -o eigsep -g eigsep /opt/eigsep/captures
-EOF
+# Stage the chroot installer at a stable rootfs path and run it as a file,
+# rather than feeding multi-step commands to `on_chroot << EOF`. With a
+# heredoc, on_chroot's inner bash reads commands from stdin; dpkg postinst
+# scripts inherit that stdin, and any postinst that reads from it (chrony,
+# isc-dhcp-server, etc.) drains the heredoc -- bash then hits EOF after
+# apt-get returns and exits 0 silently, so the venv install never runs and
+# pi-gen reports success. Invoking on_chroot with a path runs `bash -p -e
+# /opt/eigsep/_chroot-install.sh`, which reads the script as a file and is
+# immune to that drain.
+#
+# Stage under /opt/eigsep (already created above), NOT /tmp -- on_chroot's
+# first call will mount tmpfs over the rootfs's /tmp and hide anything we
+# placed there from the host side.
+install -m 0755 files/_chroot-install.sh \
+    "${ROOTFS_DIR}/opt/eigsep/_chroot-install.sh"
+on_chroot /opt/eigsep/_chroot-install.sh
+rm -f "${ROOTFS_DIR}/opt/eigsep/_chroot-install.sh"
