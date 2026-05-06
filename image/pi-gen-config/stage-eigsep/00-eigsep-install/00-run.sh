@@ -41,12 +41,18 @@ for conf in files/chrony/*.conf; do
         "${ROOTFS_DIR}/etc/eigsep/chrony/$(basename "$conf")"
 done
 
-# Install DHCP config. Inert on Pis that don't have dhcp = true in
-# /boot/eigsep-role.conf — isc-dhcp-server is role-scoped to dhcp-master.
+# Stage DHCP configs under /opt/eigsep, not /etc/dhcp/ and /etc/default/.
+# A pre-existing conffile in /etc triggers a dpkg prompt during the
+# chroot's apt-get install isc-dhcp-server, which fails under
+# noninteractive apt with "end of file on stdin at conffile prompt".
+# _chroot-install.sh copies these into place after apt returns. Inert
+# on Pis that don't have dhcp = true in /boot/eigsep-role.conf —
+# isc-dhcp-server is role-scoped to dhcp-master.
+install -d "${ROOTFS_DIR}/opt/eigsep/dhcp"
 install -m 0644 files/dhcp/dhcpd.conf \
-    "${ROOTFS_DIR}/etc/dhcp/dhcpd.conf"
+    "${ROOTFS_DIR}/opt/eigsep/dhcp/dhcpd.conf"
 install -m 0644 files/dhcp/isc-dhcp-server \
-    "${ROOTFS_DIR}/etc/default/isc-dhcp-server"
+    "${ROOTFS_DIR}/opt/eigsep/dhcp/isc-dhcp-server"
 
 # Field-LAN Redis overrides. Pulled in by an include line appended to
 # /etc/redis/redis.conf below; see the snippet's header for the

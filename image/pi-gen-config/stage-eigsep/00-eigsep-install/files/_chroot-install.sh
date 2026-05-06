@@ -22,6 +22,15 @@ apt-get install -y --no-install-recommends \
     xvfb \
     git curl
 
+# Overlay dhcp configs after apt-get install, not before in 00-run.sh:
+# pre-existing conffiles in /etc trigger a dpkg prompt that fails under
+# noninteractive apt. Same post-apt-overlay pattern as the redis include
+# below.
+install -m 0644 /opt/eigsep/dhcp/dhcpd.conf /etc/dhcp/dhcpd.conf
+install -m 0644 /opt/eigsep/dhcp/isc-dhcp-server \
+    /etc/default/isc-dhcp-server
+rm -rf /opt/eigsep/dhcp
+
 # Pull our overrides into the Debian-shipped redis.conf. Appended at the
 # end so the directives in eigsep.conf override the stock loopback-only
 # bind and protected-mode yes. The snippet itself was staged into the
