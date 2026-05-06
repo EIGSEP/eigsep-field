@@ -98,6 +98,12 @@ jobs:
           esac
           cp -r image/pi-gen-config/stage-eigsep /tmp/pi-gen/stage-eigsep
           cp image/pi-gen-config/config /tmp/pi-gen/config
+          # Suppress stage2's deploy export so pi-gen only emits the
+          # stage-eigsep image. Without this we'd get two .img.xz artifacts
+          # in /tmp/pi-gen/deploy/ (the stock "lite" one and ours), and
+          # whichever sorted first would be flashed by operators. Pi-gen's
+          # SKIP_IMAGES marker turns off the export-image hook for that stage.
+          touch /tmp/pi-gen/stage2/SKIP_IMAGES
           # pi-gen sources `config` as shell. Quote with shlex so a password
           # containing spaces/quotes/`$` survives intact. Reject embedded
           # newlines/CR first so the assignment stays single-line. Prepend
@@ -116,6 +122,37 @@ jobs:
       - name: Build image
         working-directory: /tmp/pi-gen
         run: sudo ./build.sh
+      - name: Verify stage-eigsep landed in deploy
+        # Catch the regression class where stage-eigsep runs but its
+        # output is silently discarded (missing EXPORT_IMAGE marker, or
+        # stage2's deploy not suppressed). Pi-gen returns 0 in that case
+        # and ships a stock Debian Lite image. Inspect the rootfs that
+        # would be exported and assert the eigsep-stage artifacts are
+        # present; also assert exactly one .img.xz with no "-lite" suffix
+        # made it to deploy/.
+        run: |
+          ROOTFS=/tmp/pi-gen/work/eigsep-field/stage-eigsep/rootfs
+          for path in \
+              /etc/eigsep/manifest.toml \
+              /opt/eigsep/venv/bin/eigsep-field \
+              /usr/local/bin/eigsep-field; do
+              if ! sudo test -e "$ROOTFS$path"; then
+                  echo "::error::stage-eigsep rootfs is missing $path"
+                  exit 1
+              fi
+          done
+          shopt -s nullglob
+          imgs=( /tmp/pi-gen/deploy/*.img.xz )
+          if [ ${#imgs[@]} -ne 1 ]; then
+              echo "::error::Expected exactly 1 .img.xz in deploy/, got ${#imgs[@]}"
+              printf '  %s\n' "${imgs[@]}"
+              exit 1
+          fi
+          if [[ "${imgs[0]}" == *-lite.img.xz ]]; then
+              echo "::error::Deploy artifact has -lite suffix (${imgs[0]##*/});"
+              echo "::error::stage-eigsep EXPORT_IMAGE missing or stage2 SKIP_IMAGES not set."
+              exit 1
+          fi
       - name: Collect artifacts
         run: |
           mkdir -p out
