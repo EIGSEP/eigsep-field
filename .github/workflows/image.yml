@@ -206,11 +206,21 @@ jobs:
         # made it to deploy/.
         run: |
           ROOTFS=/tmp/pi-gen/work/eigsep-field/stage-eigsep/rootfs
+          # `-e` follows symlinks, and the chroot's `ln -sf
+          # /opt/eigsep/venv/bin/eigsep-field /usr/local/bin/eigsep-field`
+          # leaves an *absolute* symlink that resolves only inside the
+          # rootfs. From the host, `-e` chases the absolute target into
+          # the host's own /opt/eigsep (which doesn't exist) and reports
+          # the symlink as missing. Accept `-L` so a present-but-rootfs-
+          # absolute symlink passes; the symlink target is checked
+          # separately above (`/opt/eigsep/venv/bin/eigsep-field` is in
+          # the loop and resolves as a regular file).
           for path in \
               /etc/eigsep/manifest.toml \
               /opt/eigsep/venv/bin/eigsep-field \
               /usr/local/bin/eigsep-field; do
-              if ! sudo test -e "$ROOTFS$path"; then
+              if ! sudo test -e "$ROOTFS$path" \
+                  && ! sudo test -L "$ROOTFS$path"; then
                   echo "::error::stage-eigsep rootfs is missing $path"
                   exit 1
               fi
