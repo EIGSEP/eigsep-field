@@ -57,6 +57,10 @@ def _versions_equal(a: str, b: str) -> bool:
 
 def _cmd_info(_: argparse.Namespace) -> int:
     manifest = load_manifest()
+    image = manifest.get("image", {})
+    if image.get("dev"):
+        sha = image.get("sha", "unknown")
+        print(f"*** DEV BUILD {sha} — not a blessed release ***")
     print(f"release: {manifest['release']}  python: {manifest['python']}")
     print()
     print(f"{'package':<24} {'blessed':<12} {'installed':<12} status")

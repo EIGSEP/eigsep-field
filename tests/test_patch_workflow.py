@@ -285,7 +285,7 @@ def test_doctor_drift_section_flags_dirty(fake_src, manifest):
 # ----- _image_install.clone-sources targets -----
 
 
-def test_clone_targets_covers_all_siblings_plus_field(manifest):
+def test_clone_targets_covers_siblings_not_self(manifest):
     sys.path.insert(0, str(REPO_ROOT / "src"))
     try:
         from eigsep_field._image_install import _clone_targets
@@ -297,4 +297,6 @@ def test_clone_targets_covers_all_siblings_plus_field(manifest):
         assert pkg in names
     for hw in manifest["hardware"]:
         assert hw in names
-    assert "eigsep-field" in names
+    # eigsep-field is staged from the runner's checkout in image.yml,
+    # not cloned from upstream — see _image_install module docstring.
+    assert "eigsep-field" not in names

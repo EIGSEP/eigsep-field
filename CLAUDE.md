@@ -185,6 +185,22 @@ follow its checklist. The tag (`vYYYY.MM.P`) is what triggers
 (manifest bump + lock refresh + interface-doc regen + release notes) has
 merged to `main`.
 
+`image.yml` distinguishes blessed from DEV builds by comparing the
+trigger ref against `f"v{manifest['release']}"`. Only an exact match
+uploads to the GitHub Release; everything else (workflow_dispatch,
+rc-style tags, hotfix-test tags) is DEV-stamped, the rootfs's
+`/etc/eigsep/manifest.toml` gets an `[image] dev = true` block, and
+motd / `eigsep-field info` render a "*** DEV BUILD <sha> ***" banner.
+DEV images are still produced and uploaded as a workflow artifact for
+QA; they just can't be confused with a release.
+
+The eigsep-field source tree shipped on the image at
+`/opt/eigsep/src/eigsep-field` is staged from the runner's
+`actions/checkout` (the SHA that triggered the build), not re-cloned
+from upstream by `_image_install.clone-sources`. This makes the on-image
+tree structurally pinned to the trigger SHA — no chance of skew between
+the manifest's release field and the actual tag.
+
 We deliberately do **not** use `release-please` here (siblings do): calver
 isn't commit-driven, the source of truth is `manifest.toml` rather than
 `pyproject.toml`, and there's no PyPI publish to automate — the artifacts

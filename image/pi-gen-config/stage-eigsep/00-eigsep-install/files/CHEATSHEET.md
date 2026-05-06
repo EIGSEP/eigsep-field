@@ -1,5 +1,5 @@
 # EIGSEP field cheatsheet — release {{release}}
-
+{{dev_banner}}
 The Pi is offline. No `pip install <X>`, no `git pull`, no `apt update`.
 Everything you need is already on disk.
 

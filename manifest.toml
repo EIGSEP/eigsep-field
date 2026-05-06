@@ -121,12 +121,6 @@ source  = "https://github.com/EIGSEP/eigsep_dac"
 commit  = ""
 sha256  = ""
 
-# ---- RPi image artifact (hashes are published as sidecar .sha256 in the
-# Release because the image is built from this manifest — chicken-and-egg).
-
-[image]
-tag = "v2026.4.0"
-
 # ---- Out-of-band pins (system packages baked into the image) ----
 
 [system]

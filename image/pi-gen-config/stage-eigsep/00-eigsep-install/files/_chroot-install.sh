@@ -71,12 +71,18 @@ systemctl mask systemd-timesyncd.service || true
 # eigsep-first-boot.service enables the matching subset.
 /opt/eigsep/venv/bin/python -m eigsep_field._image_install enable-always
 
-# Clone every [packages.*] / [hardware.*] tree (plus eigsep-field) into
-# /opt/eigsep/src/<name> at the manifest-pinned tag. Operator-owned so
-# `git checkout -b field-fix-XXX` works in the field. Needs network in
-# the chroot, which we have here (apt-get update succeeded above).
+# Clone every [packages.*] / [hardware.*] tree into /opt/eigsep/src/<name>
+# at the manifest-pinned tag. Operator-owned so `git checkout -b
+# field-fix-XXX` works in the field. Needs network in the chroot, which
+# we have here (apt-get update succeeded above). The eigsep-field
+# self-clone is not part of this — 00-run.sh already staged it from the
+# runner's checkout; we just chown to the operator user here, since
+# `eigsep` doesn't exist on the runner.
 install -d /opt/eigsep/src
 /opt/eigsep/venv/bin/python -m eigsep_field._image_install clone-sources
+if [ -d /opt/eigsep/src/eigsep-field ]; then
+    chown -R eigsep:eigsep /opt/eigsep/src/eigsep-field
+fi
 
 # Field-capture output dir: operator-writable so `eigsep-field capture`
 # doesn't need sudo.

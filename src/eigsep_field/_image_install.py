@@ -10,11 +10,17 @@ consumes the manifest and:
   ``activation = "always"``. Role services are left disabled; they're
   enabled on first boot by ``eigsep-first-boot.service``.
 - ``clone-sources``: ``git clone`` every ``[packages.*]`` and
-  ``[hardware.*]`` (plus eigsep-field itself) into
-  ``/opt/eigsep/src/<name>/`` at the manifest-pinned tag, freezing the
-  resolved commit in ``.eigsep-blessed-commit`` so the doctor's drift
-  check is deterministic and offline. Operator-owned so ``git commit``
-  works in the field.
+  ``[hardware.*]`` into ``/opt/eigsep/src/<name>/`` at the
+  manifest-pinned tag, freezing the resolved commit in
+  ``.eigsep-blessed-commit`` so the doctor's drift check is
+  deterministic and offline. Operator-owned so ``git commit`` works in
+  the field.
+
+The eigsep-field self-clone is not handled here. ``image.yml`` stages
+the runner's ``actions/checkout`` tree directly into the rootfs at
+``/opt/eigsep/src/eigsep-field`` so the on-image source tree is
+structurally pinned to the SHA that triggered the build (no upstream
+re-clone, no chance of tag/manifest skew).
 """
 
 from __future__ import annotations
@@ -26,8 +32,6 @@ from pathlib import Path
 
 from eigsep_field import load_manifest
 from eigsep_field._services import systemctl
-
-EIGSEP_FIELD_URL = "https://github.com/EIGSEP/eigsep-field"
 
 
 def _cmd_enable_always(_: argparse.Namespace) -> int:
@@ -52,18 +56,15 @@ def _cmd_enable_always(_: argparse.Namespace) -> int:
 def _clone_targets(manifest: dict) -> list[tuple[str, str, str]]:
     """Return (name, source, tag) for every tree to clone into /opt/eigsep/src.
 
-    Order matters for readable build logs: packages first, then hardware,
-    then the eigsep-field self-clone last (so its absence in earlier
-    iterations isn't load-bearing for any sibling).
+    eigsep-field itself is not in this list — image.yml stages the
+    runner's checkout into the rootfs before this runs, so the on-image
+    eigsep-field tree is the SHA that triggered the build.
     """
     targets: list[tuple[str, str, str]] = []
     for name, entry in manifest.get("packages", {}).items():
         targets.append((name, entry["source"], entry["tag"]))
     for name, entry in manifest.get("hardware", {}).items():
         targets.append((name, entry["source"], entry["tag"]))
-    image_tag = manifest.get("image", {}).get("tag")
-    eigsep_tag = image_tag or f"v{manifest['release']}"
-    targets.append(("eigsep-field", EIGSEP_FIELD_URL, eigsep_tag))
     return targets
 
 
