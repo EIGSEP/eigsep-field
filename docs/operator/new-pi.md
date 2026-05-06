@@ -57,7 +57,7 @@ arp -an | grep 10.10.10.
 ```
 
 Capture the new Pi's MAC. Then add (or uncomment) the reservation in
-[`image/pi-gen-config/stage-eigsep/files/dhcp/dhcpd.conf`](../../image/pi-gen-config/stage-eigsep/files/dhcp/dhcpd.conf):
+[`image/pi-gen-config/stage-eigsep/00-eigsep-install/files/dhcp/dhcpd.conf`](../../image/pi-gen-config/stage-eigsep/00-eigsep-install/files/dhcp/dhcpd.conf):
 
 ```
 host panda {

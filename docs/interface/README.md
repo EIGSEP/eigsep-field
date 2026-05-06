@@ -21,7 +21,7 @@ a git SHA (not `main`) so they stay stable as the repos evolve.
 
 The Pi image declares systemd services in `manifest.toml` `[services.*]`.
 Each sibling-owned unit file is copied into
-`image/pi-gen-config/stage-eigsep/files/systemd/` (with paths rewritten
+`image/pi-gen-config/stage-eigsep/00-eigsep-install/files/systemd/` (with paths rewritten
 for the image's `/opt/eigsep/venv` layout) and tracked against the
 permalink below.
 

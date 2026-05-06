@@ -61,17 +61,26 @@ jobs:
               echo "::error::Timed out waiting for wheelhouse to complete"
               exit 1
           fi
-          mkdir -p image/pi-gen-config/stage-eigsep/files/wheels
+          mkdir -p image/pi-gen-config/stage-eigsep/00-eigsep-install/files/wheels
           gh release download "$TAG" --pattern 'wheels-*.tar.xz' \
               --dir /tmp/wheels
-          tar -C image/pi-gen-config/stage-eigsep/files/wheels \
+          tar -C image/pi-gen-config/stage-eigsep/00-eigsep-install/files/wheels \
               -xJf /tmp/wheels/wheels-linux_aarch64.tar.xz
       - name: Pull firmware blobs referenced in manifest
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           python3 scripts/fetch_firmware.py manifest.toml \
-              image/pi-gen-config/stage-eigsep/files/firmware
+              image/pi-gen-config/stage-eigsep/00-eigsep-install/files/firmware
+      - name: Stage manifest.toml for stage-eigsep
+        # 00-run.sh installs this to /etc/eigsep/manifest.toml in the
+        # rootfs and reads its [release] field for the motd/cheatsheet
+        # substitution. Pi-gen never sees the repo root, so copy it into
+        # the sub-stage's files/ tree where the install script expects it.
+        run: |
+          install -d image/pi-gen-config/stage-eigsep/00-eigsep-install/files/etc-eigsep
+          install -m 0644 manifest.toml \
+              image/pi-gen-config/stage-eigsep/00-eigsep-install/files/etc-eigsep/manifest.toml
       - name: Clone pi-gen
         run: git clone --depth=1 --branch arm64 https://github.com/RPi-Distro/pi-gen.git /tmp/pi-gen
       - name: Layer stage-eigsep into pi-gen

@@ -125,7 +125,7 @@ uniform across Pis; per-Pi differentiation is the role set in
      tag must match the corresponding `[packages.*].tag`.
 2. For `kind = "local"` or `kind = "sibling"`, drop the unit file (adapted
    for the image's `/opt/eigsep/venv` layout) in
-   `image/pi-gen-config/stage-eigsep/files/systemd/`.
+   `image/pi-gen-config/stage-eigsep/00-eigsep-install/files/systemd/`.
 3. For role services, update the role's `.target` (`eigsep-panda.target`,
    `eigsep-backend.target`, `eigsep-dhcp.target`) to `Wants=` the new unit.
 4. For `kind = "sibling"`, add a permalink row in

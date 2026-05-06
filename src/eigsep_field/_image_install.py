@@ -1,5 +1,5 @@
-"""Image-build helper invoked by ``stage-eigsep/00-run.sh`` inside the
-pi-gen chroot.
+"""Image-build helper invoked by ``stage-eigsep/00-eigsep-install/00-run.sh``
+inside the pi-gen chroot.
 
 The stage's bash ``install`` commands handle the file copy from
 ``files/systemd/`` into ``${ROOTFS_DIR}/etc/systemd/system/`` (no manifest
