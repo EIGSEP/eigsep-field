@@ -44,11 +44,15 @@ if ! grep -qF "redis.conf.d/eigsep.conf" /etc/redis/redis.conf; then
 fi
 
 python3 -m venv /opt/eigsep/venv
+# requirements.txt already pins eigsep-field==<release> with --hash
+# (appended by scripts/build-wheelhouse.sh step 4), so a single -r install
+# resolves the meta wheel and every transitive dep. Passing `eigsep-field`
+# as a bare positional here would be unpinned and reject the resolve under
+# --require-hashes.
 /opt/eigsep/venv/bin/pip install --no-index \
     --find-links /opt/eigsep/wheels \
     --require-hashes \
-    -r /opt/eigsep/wheels/requirements.txt \
-    eigsep-field
+    -r /opt/eigsep/wheels/requirements.txt
 
 ln -sf /opt/eigsep/venv/bin/eigsep-field /usr/local/bin/eigsep-field
 
