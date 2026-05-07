@@ -124,6 +124,52 @@ def is_enabled(unit: str) -> bool:
     return rc == 0
 
 
+def unit_health(unit: str) -> tuple[bool, str]:
+    """Return ``(healthy, state)`` for a systemd unit.
+
+    Long-running services are healthy when ``ActiveState=active``.
+    Oneshot services with ``RemainAfterExit=no`` (like
+    ``eigsep-first-boot.service``) return to ``inactive`` after a clean
+    exit — ``is_active`` would falsely flag them as broken. We consult
+    ``systemctl show`` to distinguish "ran successfully and exited" from
+    "never ran" or "failed".
+
+    ``state`` is a short human-readable string for doctor output.
+    """
+    if is_active(unit):
+        return True, "active"
+    rc, out = systemctl(
+        "show", "--value", "-p", "Type,RemainAfterExit,Result", unit
+    )
+    if rc != 0:
+        return False, "inactive"
+    parts = out.splitlines()
+    type_ = parts[0] if len(parts) > 0 else ""
+    remain = parts[1] if len(parts) > 1 else ""
+    result = parts[2] if len(parts) > 2 else ""
+    if type_ == "oneshot" and remain == "no" and result == "success":
+        return True, "oneshot done"
+    return False, "inactive"
+
+
+def entry_for_role(entry: dict, role: str | None) -> bool:
+    """Return ``True`` if a ``[firmware.*]`` / ``[hardware.*]`` entry
+    applies to the given role.
+
+    Entries without a ``roles`` field default to all roles (back-compat).
+    Entries with an explicit ``roles = [...]`` list are checked only
+    against the named roles. ``role=None`` (no role applied yet) skips
+    role-scoped entries entirely so the doctor doesn't fail on a freshly
+    flashed Pi where /etc/eigsep/role hasn't been written.
+    """
+    roles = entry.get("roles")
+    if roles is None:
+        return True
+    if role is None:
+        return False
+    return role in roles
+
+
 def services_importing(services: dict, package_tag: str) -> list[str]:
     """Return systemd unit names whose sibling tag matches ``package_tag``.
 

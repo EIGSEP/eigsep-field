@@ -57,10 +57,15 @@ sha256  = ""
 # installs (CI, dev) should not pull them from git. ----
 
 [hardware.casperfpga]
-# SNAP board driver (CASPER collaboration).
+# SNAP board driver (CASPER collaboration). Imported by
+# eigsep-observe.service on the backend Pi to talk to the SNAP; not used
+# by panda or dhcp-master service code paths. The `roles` gate keeps
+# `eigsep-field doctor` from flagging it missing on Pis that don't
+# import it.
 version = "0.7.1"
 tag     = "v0.7.1"
 source  = "https://github.com/EIGSEP/casperfpga"
+roles   = ["backend"]
 
 # ---- Field-debug Python packages (PyPI, not part of the runtime stack).
 # Shipped in the wheelhouse via the `debug` extra so they're present on
@@ -105,21 +110,26 @@ version = "0.10.4"
 # upstream's build output (`build/pico_multi.uf2` from build.sh) — see
 # pico-firmware's release-please.yml job that attaches it to the tagged
 # Release. Stable across releases; provenance is enforced by sha256 below.
+# Loaded by picomanager.service which only runs on the panda Pi.
 version = "v3.1.1"
 asset   = "pico_multi.uf2"
 source  = "https://github.com/EIGSEP/pico-firmware"
 tag     = "v3.1.1"
 sha256  = ""
+roles   = ["panda"]
 
 [firmware.rfsoc_bitstream]
 # Produced by a script in eigsep_dac; flashed to the RFSoC. eigsep_dac is
 # not release-managed, so we pin by commit SHA. loader.py is vendored at
-# this commit into firmware/rfsoc/loader.py.
+# this commit into firmware/rfsoc/loader.py. The .npz lives on the
+# backend Pi at /opt/eigsep/firmware/rfsoc/ where eigsep-observe.service
+# loads it via casperfpga; panda and dhcp-master never read it.
 version = "2026-04-01"
 asset   = "eigsep_vivaldi_2026-04-01.npz"
 source  = "https://github.com/EIGSEP/eigsep_dac"
 commit  = ""
 sha256  = ""
+roles   = ["backend"]
 
 # ---- Out-of-band pins (system packages baked into the image) ----
 

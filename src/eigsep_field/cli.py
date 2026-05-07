@@ -36,6 +36,7 @@ from eigsep_field._services import (
     KNOWN_ROLES,
     ROLE_FILE,
     RoleConfig,
+    entry_for_role,
     is_active,
     is_enabled,
     nmcli,
@@ -44,6 +45,7 @@ from eigsep_field._services import (
     services_for_role,
     services_importing_package,
     systemctl,
+    unit_health,
 )
 
 
@@ -151,12 +153,24 @@ def _sha256(path: Path) -> str:
     return h.hexdigest()
 
 
-def _check_firmware(manifest: dict) -> tuple[list[str], list[str]]:
-    """Return (ok, problems) for firmware blobs under /opt/eigsep/firmware."""
+def _check_firmware(
+    manifest: dict, role_cfg: RoleConfig
+) -> tuple[list[str], list[str]]:
+    """Return (ok, problems) for firmware blobs under /opt/eigsep/firmware.
+
+    Role-aware: a ``[firmware.<kind>]`` entry with ``roles = [...]`` is
+    only checked when the running Pi's role matches one of the listed
+    roles. Entries without ``roles`` are checked on every Pi.
+    """
     ok: list[str] = []
     problems: list[str] = []
     firmware_root = Path("/opt/eigsep/firmware")
     for kind, entry in manifest.get("firmware", {}).items():
+        if not entry_for_role(entry, role_cfg.role):
+            ok.append(
+                f"{kind}: skipped (not this role — roles={entry['roles']})"
+            )
+            continue
         asset = firmware_root / kind / entry["asset"]
         if not asset.exists():
             problems.append(f"{kind}: missing {asset}")
@@ -176,8 +190,15 @@ def _check_firmware(manifest: dict) -> tuple[list[str], list[str]]:
     return ok, problems
 
 
-def _check_packages(manifest: dict) -> tuple[list[str], list[str]]:
-    """Return (ok, problems) for every blessed Python package."""
+def _check_packages(
+    manifest: dict, role_cfg: RoleConfig
+) -> tuple[list[str], list[str]]:
+    """Return (ok, problems) for every blessed Python package.
+
+    ``[packages.*]`` entries are checked on every Pi (they're the core
+    stack). ``[hardware.*]`` entries are role-aware via ``roles = [...]``
+    on the manifest entry — e.g. casperfpga is only required on backend.
+    """
     ok: list[str] = []
     problems: list[str] = []
     for entry in manifest["packages"].values():
@@ -196,6 +217,11 @@ def _check_packages(manifest: dict) -> tuple[list[str], list[str]]:
             ok.append(f"{name}: {installed}")
 
     for name, entry in manifest.get("hardware", {}).items():
+        if not entry_for_role(entry, role_cfg.role):
+            ok.append(
+                f"{name}: skipped (not this role — roles={entry['roles']})"
+            )
+            continue
         blessed = entry["version"]
         try:
             installed = version(name)
@@ -252,10 +278,11 @@ def _check_services(
         if name not in expected:
             ok.append(f"{unit} skipped (not this role — {tag})")
             continue
-        if is_active(unit):
-            ok.append(f"{unit} active ({tag})")
+        healthy, state = unit_health(unit)
+        if healthy:
+            ok.append(f"{unit} {state} ({tag})")
         else:
-            problems.append(f"{unit} not active ({tag})")
+            problems.append(f"{unit} {state} ({tag})")
     return ok, problems
 
 
@@ -304,8 +331,8 @@ def _cmd_doctor(_: argparse.Namespace) -> int:
             file=sys.stderr,
         )
 
-    fw_ok, fw_prob = _check_firmware(manifest)
-    pkg_ok, pkg_prob = _check_packages(manifest)
+    fw_ok, fw_prob = _check_firmware(manifest, role_cfg)
+    pkg_ok, pkg_prob = _check_packages(manifest, role_cfg)
     svc_ok, svc_prob = _check_services(manifest, role_cfg)
     notes = _check_editable_drift(manifest)
 

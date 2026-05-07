@@ -7,6 +7,7 @@ asset   = "pico_multi.uf2"
 source  = "https://github.com/EIGSEP/pico-firmware"
 tag     = "v3.1.1"
 sha256  = ""
+roles   = ["panda"]
 
 # Notes:
 #   Targets: RP2350 (eigsep_dac uses RP2040 variants — separate artifact)
