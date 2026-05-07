@@ -53,12 +53,18 @@ def main(argv: list[str]) -> int:
         if tag := entry.get("tag"):
             _gh_download(entry["source"], tag, asset, dest_dir)
         else:
+            # Hard fail rather than warn-and-continue. A missing tag means
+            # the firmware blob will not land in the rootfs, and downstream
+            # services that load it (RFSoC bitstream → eigsep-observe)
+            # will only fail on the field Pi at runtime. Failing here
+            # keeps the bug visible at build time.
             print(
-                f"{kind}: no 'tag' in manifest; skipping auto-download "
-                f"(pin by commit means asset is not in a Release)",
+                f"{kind}: cannot resolve [firmware.{kind}] — no 'tag' set "
+                f"in manifest.toml. Populate the tag (or remove the entry "
+                f"if the asset is intentionally absent from this build).",
                 file=sys.stderr,
             )
-            continue
+            return 1
 
         path = dest_dir / asset
         if not path.exists():
