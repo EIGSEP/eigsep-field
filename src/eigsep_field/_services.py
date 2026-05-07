@@ -13,9 +13,32 @@ from dataclasses import dataclass
 from pathlib import Path
 
 ROLE_FILE = Path("/etc/eigsep/role")
-BOOT_ROLE_CONF = Path("/boot/eigsep-role.conf")
+
+# Operator-supplied role config dropped on the SD card's FAT boot
+# partition. Trixie's pi-gen mounts that partition at /boot/firmware
+# (preferred); older Bullseye/Bookworm SDs mounted it at /boot.
+# resolve_boot_role_conf() returns whichever exists, preferring the
+# Trixie path.
+BOOT_ROLE_CONF_CANDIDATES: tuple[Path, ...] = (
+    Path("/boot/firmware/eigsep-role.conf"),
+    Path("/boot/eigsep-role.conf"),
+)
 
 KNOWN_ROLES = {"panda", "backend"}
+
+
+def resolve_boot_role_conf(
+    candidates: tuple[Path, ...] = BOOT_ROLE_CONF_CANDIDATES,
+) -> Path:
+    """Return the first existing candidate, or candidates[0] if none exist.
+
+    Returning the preferred path on miss (rather than ``None``) keeps
+    error messages pointed at the canonical location.
+    """
+    for c in candidates:
+        if c.exists():
+            return c
+    return candidates[0]
 
 
 @dataclass(frozen=True)
@@ -27,7 +50,7 @@ class RoleConfig:
 def parse_role_file(path: Path) -> RoleConfig:
     """Parse ``role = <name>`` / ``dhcp = <bool>`` from a text file.
 
-    Same format for ``/boot/eigsep-role.conf`` (operator input) and
+    Same format for ``/boot/firmware/eigsep-role.conf`` (operator input) and
     ``/etc/eigsep/role`` (applied state). Missing file → empty config
     (callers decide whether that's an error).
     """
