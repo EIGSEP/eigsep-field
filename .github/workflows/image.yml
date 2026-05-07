@@ -237,6 +237,22 @@ jobs:
               echo "::error::stage-eigsep EXPORT_IMAGE missing or stage2 SKIP_IMAGES not set."
               exit 1
           fi
+      - name: Verify hardware wheels installed in venv
+        # Build-time gate: _chroot-install.sh must have consumed
+        # /opt/eigsep/wheels/hardware-requirements.txt and produced the
+        # casperfpga site-package. Catches the regression class where
+        # the chroot installer skips that file and the image ships with
+        # eigsep-observe ready to ImportError on first boot. Tied to
+        # casperfpga specifically (the only hardware.* runtime import on
+        # the backend); other [hardware.*] entries are RFSoC-side and
+        # don't land in the Pi venv.
+        run: |
+          ROOTFS=/tmp/pi-gen/work/eigsep-field/stage-eigsep/rootfs
+          if ! sudo find "$ROOTFS/opt/eigsep/venv/lib" -path '*/site-packages/casperfpga' -print -quit | grep -q .; then
+              echo "::error::casperfpga site-package missing under $ROOTFS/opt/eigsep/venv/"
+              echo "::error::_chroot-install.sh likely skipped /opt/eigsep/wheels/hardware-requirements.txt"
+              exit 1
+          fi
       - name: Collect artifacts
         run: |
           mkdir -p out
