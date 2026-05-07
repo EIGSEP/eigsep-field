@@ -47,13 +47,12 @@ def fake_firmware_root(tmp_path: Path, monkeypatch) -> Path:
 
     real_path = cli.Path
 
-    class FakePath(real_path):
-        def __new__(cls, *args, **kwargs):
-            if args and args[0] == "/opt/eigsep/firmware":
-                return real_path.__new__(cls, str(tmp_path))
-            return real_path.__new__(cls, *args, **kwargs)
+    def fake_path(*args, **kwargs):
+        if args and args[0] == "/opt/eigsep/firmware":
+            return tmp_path
+        return real_path(*args, **kwargs)
 
-    monkeypatch.setattr(cli, "Path", FakePath)
+    monkeypatch.setattr(cli, "Path", fake_path)
     return tmp_path
 
 
