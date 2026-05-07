@@ -4,6 +4,15 @@ RELEASE="trixie"
 DEPLOY_COMPRESSION=xz
 ENABLE_SSH=1
 FIRST_USER_NAME="eigsep"
+# Pre-seed keyboard + timezone so console-setup's first-boot
+# configurator doesn't fire an interactive prompt on the headless
+# field Pis. Without these, pi-gen Trixie's first boot stops at a
+# keyboard-layout dialog (debconf priority=high) until someone with
+# a screen + keyboard answers it. UTC is the right default for
+# observation timestamps anyway.
+KEYBOARD_KEYMAP="us"
+KEYBOARD_LAYOUT="English (US)"
+TIMEZONE_DEFAULT="Etc/UTC"
 # FIRST_USER_PASS is prepended to this file at build time by
 # .github/workflows/image.yml from the IMAGE_FIRST_USER_PASS repo secret,
 # so the assignment lands ahead of the `:?` assertion below. To rotate,
