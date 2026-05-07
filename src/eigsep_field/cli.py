@@ -38,6 +38,7 @@ from eigsep_field._services import (
     RoleConfig,
     is_active,
     is_enabled,
+    nmcli,
     parse_role_file,
     services_for_role,
     services_importing_package,
@@ -57,6 +58,10 @@ def _versions_equal(a: str, b: str) -> bool:
 
 def _cmd_info(_: argparse.Namespace) -> int:
     manifest = load_manifest()
+    image = manifest.get("image", {})
+    if image.get("dev"):
+        sha = image.get("sha", "unknown")
+        print(f"*** DEV BUILD {sha} — not a blessed release ***")
     print(f"release: {manifest['release']}  python: {manifest['python']}")
     print()
     print(f"{'package':<24} {'blessed':<12} {'installed':<12} status")
@@ -501,50 +506,66 @@ def _write_role_file(role_cfg: RoleConfig) -> None:
 
 
 DHCP_MASTER_STATIC_IP = "10.10.10.10/24"
-_DHCPCD_BEGIN = "# BEGIN eigsep-field (managed)"
-_DHCPCD_END = "# END eigsep-field"
+NM_CONNECTION_NAME = "eigsep-eth0"
+NM_CONNECTIONS_DIR = Path("/etc/NetworkManager/system-connections")
 
 
-def _apply_dhcp_master_static_ip(role_cfg: RoleConfig) -> int:
+def _apply_dhcp_master_static_ip(
+    role_cfg: RoleConfig, nm_dir: Path = NM_CONNECTIONS_DIR
+) -> int:
     """Pin eth0 to 10.10.10.10/24 on the dhcp-master Pi.
 
     isc-dhcp-server can't bind without a static IP on the interface
     it serves, and the rest of the LAN expects to reach the
-    dhcp-master at 10.10.10.10. We rewrite a managed block in
-    /etc/dhcpcd.conf (Raspberry Pi OS Lite's default DHCP client)
-    between BEGIN/END markers, then restart dhcpcd. Idempotent:
-    re-running replaces the block in place.
+    dhcp-master at 10.10.10.10. Trixie pi-gen Lite uses NetworkManager
+    (the dhcpcd binary is present but ships no systemd unit), so we
+    drop a keyfile in NM's system-connections directory and ask nmcli
+    to reload + activate it. Idempotent: re-running overwrites the
+    keyfile in place.
 
     No-op when role_cfg.dhcp is False.
     """
     if not role_cfg.dhcp:
         return 0
-    conf = Path("/etc/dhcpcd.conf")
-    if not conf.exists():
+    if not nm_dir.exists():
         print(
-            f"  warn: {conf} missing; cannot pin dhcp-master static IP",
+            f"  warn: {nm_dir} missing; cannot pin dhcp-master static IP",
             file=sys.stderr,
         )
         return 1
-    block = (
-        f"{_DHCPCD_BEGIN} — dhcp-master static IP.\n"
-        "# eigsep-field rewrites this block on every role apply.\n"
+    keyfile = nm_dir / f"{NM_CONNECTION_NAME}.nmconnection"
+    keyfile.write_text(
         "# Authority: image/pi-gen-config/stage-eigsep/.\n"
-        "interface eth0\n"
-        f"static ip_address={DHCP_MASTER_STATIC_IP}\n"
-        f"{_DHCPCD_END}\n"
+        "# eigsep-field rewrites this file on every role apply.\n"
+        "[connection]\n"
+        f"id={NM_CONNECTION_NAME}\n"
+        "type=ethernet\n"
+        "interface-name=eth0\n"
+        "autoconnect=true\n"
+        "autoconnect-priority=100\n"
+        "\n"
+        "[ethernet]\n"
+        "\n"
+        "[ipv4]\n"
+        "method=manual\n"
+        f"address1={DHCP_MASTER_STATIC_IP}\n"
+        "never-default=true\n"
+        "\n"
+        "[ipv6]\n"
+        "method=disabled\n"
     )
-    existing = conf.read_text()
-    if _DHCPCD_BEGIN in existing and _DHCPCD_END in existing:
-        before, _, rest = existing.partition(_DHCPCD_BEGIN)
-        _, _, after = rest.partition(_DHCPCD_END + "\n")
-        new = before.rstrip() + "\n\n" + block + after.lstrip()
-    else:
-        new = existing.rstrip() + "\n\n" + block
-    conf.write_text(new)
-    rc, msg = systemctl("restart", "dhcpcd.service")
+    # NetworkManager refuses to load world-readable keyfiles.
+    keyfile.chmod(0o600)
+    rc, msg = nmcli("connection", "reload")
     if rc != 0:
-        print(f"  warn: dhcpcd restart failed: {msg}", file=sys.stderr)
+        print(f"  warn: nmcli reload failed: {msg}", file=sys.stderr)
+        return 1
+    rc, msg = nmcli("connection", "up", NM_CONNECTION_NAME)
+    if rc != 0:
+        print(
+            f"  warn: nmcli up {NM_CONNECTION_NAME} failed: {msg}",
+            file=sys.stderr,
+        )
         return 1
     print(f"  dhcp-master: pinned eth0 to {DHCP_MASTER_STATIC_IP}")
     return 0

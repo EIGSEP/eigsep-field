@@ -14,6 +14,14 @@ jobs:
     needs: []
     steps:
       - uses: actions/checkout@v6
+        with:
+          # The runner's checkout is staged into the rootfs as
+          # /opt/eigsep/src/eigsep-field, so it must carry full history
+          # and v-tags for `git log` / `git tag` / field-fix branches to
+          # work post-flash. Default checkout is full-depth but tags are
+          # not fetched.
+          fetch-depth: 0
+          fetch-tags: true
       - uses: actions/setup-python@v6
         with:
           python-version: "3.13"
@@ -30,24 +38,28 @@ jobs:
               rsync xz-utils file git curl bc qemu-utils kpartx \
               qemu-user-binfmt
       - name: Wait for wheelhouse run, then download asset
-        # Poll the wheelhouse run for this tag's commit so we fail fast if
-        # it failed, rather than blind-polling 15 min for an asset that
-        # will never appear.
+        # Poll the wheelhouse run for this commit so we fail fast if it
+        # failed, rather than blind-polling 15 min for an asset that
+        # will never appear. Pull the wheels from the wheelhouse run's
+        # workflow artifact (uploaded unconditionally — see
+        # wheelhouse.yml's "Archive as workflow artifact" step) rather
+        # than from a Release asset, so this works for both blessed
+        # tag-push builds and DEV (workflow_dispatch / non-matching tag)
+        # builds where no Release exists yet.
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="${GITHUB_REF#refs/tags/}"
           SHA="${GITHUB_SHA}"
           status=
           conclusion=
+          run_id=
           for i in {1..30}; do
               line=$(gh run list \
                   --workflow=wheelhouse.yml --commit="$SHA" --limit 1 \
-                  --json status,conclusion \
-                  --jq 'if length == 0 then "missing|" else .[0] | "\(.status)|\(.conclusion // "")" end')
-              status="${line%%|*}"
-              conclusion="${line##*|}"
-              echo "wheelhouse: status='$status' conclusion='$conclusion' (attempt $i/30)"
+                  --json status,conclusion,databaseId \
+                  --jq 'if length == 0 then "missing||" else .[0] | "\(.status)|\(.conclusion // "")|\(.databaseId)" end')
+              IFS='|' read -r status conclusion run_id <<< "$line"
+              echo "wheelhouse: status='$status' conclusion='$conclusion' run='$run_id' (attempt $i/30)"
               if [ "$status" = "completed" ]; then
                   if [ "$conclusion" = "success" ]; then
                       break
@@ -61,9 +73,8 @@ jobs:
               echo "::error::Timed out waiting for wheelhouse to complete"
               exit 1
           fi
-          mkdir -p image/pi-gen-config/stage-eigsep/00-eigsep-install/files/wheels
-          gh release download "$TAG" --pattern 'wheels-*.tar.xz' \
-              --dir /tmp/wheels
+          mkdir -p image/pi-gen-config/stage-eigsep/00-eigsep-install/files/wheels /tmp/wheels
+          gh run download "$run_id" --name wheels-linux_aarch64 --dir /tmp/wheels
           tar -C image/pi-gen-config/stage-eigsep/00-eigsep-install/files/wheels \
               -xJf /tmp/wheels/wheels-linux_aarch64.tar.xz
       - name: Pull firmware blobs referenced in manifest
@@ -81,6 +92,60 @@ jobs:
           install -d image/pi-gen-config/stage-eigsep/00-eigsep-install/files/etc-eigsep
           install -m 0644 manifest.toml \
               image/pi-gen-config/stage-eigsep/00-eigsep-install/files/etc-eigsep/manifest.toml
+      - name: Compute build channel
+        # Blessed = the trigger is a tag push AND the tag matches
+        # f"v{manifest['release']}". Anything else (workflow_dispatch,
+        # rc-style tag, hotfix-test tag) is DEV. The release-upload step
+        # is gated on this; the rootfs gets a [image] dev marker in the
+        # next step so motd/info display "DEV BUILD <sha>".
+        run: |
+          RELEASE=$(python3 -c "import tomllib; print(tomllib.load(open('manifest.toml','rb'))['release'])")
+          EXPECTED_REF="refs/tags/v${RELEASE}"
+          if [ "${GITHUB_REF}" = "${EXPECTED_REF}" ]; then
+              IS_BLESSED=true
+          else
+              IS_BLESSED=false
+          fi
+          BUILD_SHA=$(git rev-parse --short HEAD)
+          echo "IS_BLESSED=${IS_BLESSED}" >> "$GITHUB_ENV"
+          echo "BUILD_SHA=${BUILD_SHA}" >> "$GITHUB_ENV"
+          echo "MANIFEST_RELEASE=${RELEASE}" >> "$GITHUB_ENV"
+          echo "channel: IS_BLESSED=${IS_BLESSED} BUILD_SHA=${BUILD_SHA} ref=${GITHUB_REF} expected=${EXPECTED_REF}"
+      - name: Stamp DEV marker on staged manifest
+        # Append a [image] block that 00-run.sh and `eigsep-field info`
+        # render as "*** DEV BUILD <sha> ***" so a non-blessed image
+        # cannot be confused with a release. Skipped on blessed builds
+        # so the on-disk manifest is bit-for-bit identical to the
+        # repo's manifest.toml.
+        if: env.IS_BLESSED == 'false'
+        run: |
+          STAGED=image/pi-gen-config/stage-eigsep/00-eigsep-install/files/etc-eigsep/manifest.toml
+          cat >> "$STAGED" <<EOF
+
+          [image]
+          dev = true
+          sha = "${BUILD_SHA}"
+          ref = "${GITHUB_REF}"
+          EOF
+          echo "Appended DEV marker:"
+          tail -5 "$STAGED"
+      - name: Stage eigsep-field source tree
+        # Clone the runner's already-checked-out workspace into the
+        # stage's files/ tree so 00-run.sh can copy it into the rootfs
+        # at /opt/eigsep/src/eigsep-field. --no-local forces an object
+        # copy (not a hardlink alias of the workspace's .git), so the
+        # staged tree's history is self-contained and won't be polluted
+        # by later mutations of the workspace. fetch-depth: 0 +
+        # fetch-tags: true on the checkout above ensure full history
+        # and v-tags survive the clone. The clone leaves origin pointing
+        # at the runner's workspace path; rewrite it to the GitHub URL
+        # so the on-image tree has a usable remote for the field-fix
+        # workflow (`git checkout -b field-fix-XXX && git push`).
+        run: |
+          STAGED=image/pi-gen-config/stage-eigsep/00-eigsep-install/files/eigsep-field-src
+          git clone --no-local "$GITHUB_WORKSPACE" "$STAGED"
+          git -C "$STAGED" remote set-url origin \
+              "https://github.com/${GITHUB_REPOSITORY}.git"
       - name: Clone pi-gen
         run: git clone --depth=1 --branch arm64 https://github.com/RPi-Distro/pi-gen.git /tmp/pi-gen
       - name: Layer stage-eigsep into pi-gen
@@ -141,11 +206,21 @@ jobs:
         # made it to deploy/.
         run: |
           ROOTFS=/tmp/pi-gen/work/eigsep-field/stage-eigsep/rootfs
+          # `-e` follows symlinks, and the chroot's `ln -sf
+          # /opt/eigsep/venv/bin/eigsep-field /usr/local/bin/eigsep-field`
+          # leaves an *absolute* symlink that resolves only inside the
+          # rootfs. From the host, `-e` chases the absolute target into
+          # the host's own /opt/eigsep (which doesn't exist) and reports
+          # the symlink as missing. Accept `-L` so a present-but-rootfs-
+          # absolute symlink passes; the symlink target is checked
+          # separately above (`/opt/eigsep/venv/bin/eigsep-field` is in
+          # the loop and resolves as a regular file).
           for path in \
               /etc/eigsep/manifest.toml \
               /opt/eigsep/venv/bin/eigsep-field \
               /usr/local/bin/eigsep-field; do
-              if ! sudo test -e "$ROOTFS$path"; then
+              if ! sudo test -e "$ROOTFS$path" \
+                  && ! sudo test -L "$ROOTFS$path"; then
                   echo "::error::stage-eigsep rootfs is missing $path"
                   exit 1
               fi
@@ -173,9 +248,24 @@ jobs:
               sha256sum "${f}.part."* >> "${f}.sha256"
           done
       - name: Upload to release
-        if: startsWith(github.ref, 'refs/tags/')
+        # Only the blessed channel uploads to a Release. DEV builds
+        # (workflow_dispatch, rc-style tag, anything where the trigger
+        # ref doesn't equal v{manifest.release}) skip this step and are
+        # only available as the workflow artifact below.
+        if: env.IS_BLESSED == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="${GITHUB_REF#refs/tags/}"
           gh release upload "$TAG" out/*.part.* out/*.sha256 --clobber
+      - name: Upload as workflow artifact
+        # Always uploaded so DEV builds are downloadable for QA. For
+        # blessed builds this is a redundant copy of the Release assets,
+        # at the cost of a few minutes of CI artifact storage.
+        uses: actions/upload-artifact@v4
+        with:
+          name: eigsep-field-image
+          path: |
+            out/*.part.*
+            out/*.sha256
+          retention-days: 14

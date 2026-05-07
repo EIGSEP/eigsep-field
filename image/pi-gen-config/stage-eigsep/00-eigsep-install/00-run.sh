@@ -86,11 +86,51 @@ install -d -m 0755 "${ROOTFS_DIR}/etc/sudoers.d"
 install -m 0440 files/sudoers.d/eigsep-field \
     "${ROOTFS_DIR}/etc/sudoers.d/eigsep-field"
 
-# Cheatsheet + MOTD. Substitute {{release}} from the staged manifest so
-# the on-disk copies are self-describing for whoever ssh's in.
+# Stage the eigsep-field source tree from the runner's checkout. image.yml
+# does `git clone --no-local "$GITHUB_WORKSPACE" files/eigsep-field-src`
+# before invoking pi-gen, so the tree here is the SHA that triggered the
+# build with full git history + tags. Mirrors the per-target writeout that
+# _image_install.clone-sources does for sibling repos: copy in, freeze
+# HEAD into .eigsep-blessed-commit (consumed by the doctor's drift
+# check), and exclude that marker from `git status` so the operator's
+# tree looks clean. chown is deferred to _chroot-install.sh because the
+# `eigsep` user does not exist on the runner.
+install -d "${ROOTFS_DIR}/opt/eigsep/src"
+cp -a files/eigsep-field-src "${ROOTFS_DIR}/opt/eigsep/src/eigsep-field"
+git -C files/eigsep-field-src rev-parse HEAD \
+    > "${ROOTFS_DIR}/opt/eigsep/src/eigsep-field/.eigsep-blessed-commit"
+echo ".eigsep-blessed-commit" \
+    >> "${ROOTFS_DIR}/opt/eigsep/src/eigsep-field/.git/info/exclude"
+
+# Cheatsheet + MOTD. Substitute {{release}} and {{dev_banner}} from the
+# staged manifest so the on-disk copies are self-describing for whoever
+# ssh's in. {{dev_banner}} resolves to a "*** DEV BUILD <sha> ***" line
+# on dispatch / non-blessed-tag builds (see image.yml's "Stamp DEV
+# marker" step) and is removed entirely on blessed builds.
 RELEASE_VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('files/etc-eigsep/manifest.toml','rb'))['release'])")
+DEV_BANNER=$(python3 - <<'PY'
+import tomllib
+m = tomllib.load(open('files/etc-eigsep/manifest.toml', 'rb'))
+img = m.get('image', {})
+if img.get('dev'):
+    sha = img.get('sha', 'unknown')
+    print(
+        f"*** DEV BUILD {sha} — not a blessed release ***",
+        end='',
+    )
+PY
+)
 install -m 0644 files/CHEATSHEET.md "${ROOTFS_DIR}/opt/eigsep/CHEATSHEET.md"
 install -m 0644 files/etc-eigsep/motd "${ROOTFS_DIR}/etc/motd"
+if [ -z "${DEV_BANNER}" ]; then
+    sed -i "/{{dev_banner}}/d" \
+        "${ROOTFS_DIR}/opt/eigsep/CHEATSHEET.md" \
+        "${ROOTFS_DIR}/etc/motd"
+else
+    sed -i "s|{{dev_banner}}|${DEV_BANNER}|g" \
+        "${ROOTFS_DIR}/opt/eigsep/CHEATSHEET.md" \
+        "${ROOTFS_DIR}/etc/motd"
+fi
 sed -i "s|{{release}}|${RELEASE_VERSION}|g" \
     "${ROOTFS_DIR}/opt/eigsep/CHEATSHEET.md" \
     "${ROOTFS_DIR}/etc/motd"

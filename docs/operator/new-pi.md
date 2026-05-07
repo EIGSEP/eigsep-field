@@ -16,7 +16,7 @@ Each Pi runs one role:
 ## 2. Flash the latest image
 
 ```
-./scripts/flash-image.sh                # uses manifest.toml [image].tag
+./scripts/flash-image.sh                # uses v{manifest.release}
 ./scripts/flash-image.sh v2026-5.0-rc1  # or pin to a specific tag
 ```
 
