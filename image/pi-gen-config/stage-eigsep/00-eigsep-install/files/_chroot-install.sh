@@ -20,7 +20,8 @@ apt-get install -y --no-install-recommends \
     chrony \
     picotool \
     xvfb \
-    git curl
+    git curl \
+    vim-nox
 
 # Overlay dhcp configs after apt-get install, not before in 00-run.sh:
 # pre-existing conffiles in /etc trigger a dpkg prompt that fails under
