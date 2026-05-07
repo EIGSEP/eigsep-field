@@ -110,7 +110,7 @@ Services are declared in `manifest.toml` `[services.*]` and driven from
 there by image build (`scripts/_image_install.py`'s `enable-always` step),
 `eigsep-field doctor`, and `eigsep-field services`. The image is
 uniform across Pis; per-Pi differentiation is the role set in
-`/boot/eigsep-role.conf` applied by `eigsep-first-boot.service`.
+`/boot/firmware/eigsep-role.conf` applied by `eigsep-first-boot.service`.
 
 1. Add `[services.<name>]` to `manifest.toml` with:
    - `kind` — `"apt"` (provided by a Debian package), `"local"` (owned by
@@ -118,7 +118,8 @@ uniform across Pis; per-Pi differentiation is the role set in
      drift).
    - `unit` — the systemd unit filename.
    - `activation` — `"always"` (enabled on every Pi at build time) or
-     `"role"` (enabled on first boot when `/boot/eigsep-role.conf` matches).
+     `"role"` (enabled on first boot when `/boot/firmware/eigsep-role.conf`
+     matches).
    - `role` — required when `activation = "role"`. One of `"panda"`,
      `"backend"`, or `"dhcp-master"`.
    - `source` / `tag` / `source_path` — required for `kind = "sibling"`;

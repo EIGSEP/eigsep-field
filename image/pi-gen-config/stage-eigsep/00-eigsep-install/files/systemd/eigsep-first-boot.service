@@ -1,16 +1,23 @@
 [Unit]
 Description=EIGSEP first-boot role selector
-# Applies /boot/eigsep-role.conf once per image flash: enables the matching
-# role's [services.*] entries, then self-disables. Idempotent — editing the
-# role file and `systemctl enable eigsep-first-boot.service; reboot` re-rolls
-# the Pi.
-ConditionPathExists=/boot/eigsep-role.conf
+# Applies the operator's eigsep-role.conf once per image flash: enables
+# the matching role's [services.*] entries, then self-disables. Idempotent —
+# editing the role file and `systemctl enable eigsep-first-boot.service;
+# reboot` re-rolls the Pi.
+#
+# The role conf lives on the SD card's FAT boot partition. Trixie's pi-gen
+# mounts it at /boot/firmware (preferred); older Bullseye/Bookworm SDs
+# mounted it at /boot. The "|"-prefixed conditions form a logical OR, so
+# either path triggers the unit. eigsep-field _apply-role (no positional
+# arg) resolves the same candidates internally.
+ConditionPathExists=|/boot/firmware/eigsep-role.conf
+ConditionPathExists=|/boot/eigsep-role.conf
 After=multi-user.target
 Wants=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/bin/eigsep-field _apply-role /boot/eigsep-role.conf
+ExecStart=/usr/local/bin/eigsep-field _apply-role
 RemainAfterExit=no
 
 [Install]

@@ -147,8 +147,8 @@ platform = "linux_aarch64"
 # The image is identical on every Pi. Per-Pi differentiation happens at
 # enable time: activation="always" services are enabled at image build;
 # activation="role" services are installed but only enabled by
-# eigsep-first-boot.service when /boot/eigsep-role.conf picks the matching
-# role.
+# eigsep-first-boot.service when /boot/firmware/eigsep-role.conf picks
+# the matching role.
 #
 # kind:
 #   apt      — provided by an APT package; no unit file shipped here.
@@ -247,8 +247,9 @@ activation = "role"
 role       = "dhcp-master"
 
 [services.eigsep_first_boot]
-# Oneshot that runs on every boot until /boot/eigsep-role.conf has been
-# applied; enables the role-matching services and self-disables.
+# Oneshot that runs on every boot until /boot/firmware/eigsep-role.conf
+# (or legacy /boot/eigsep-role.conf) has been applied; enables the role-
+# matching services and self-disables.
 kind       = "local"
 unit       = "eigsep-first-boot.service"
 activation = "always"

@@ -26,14 +26,17 @@ command. Run the printed `dd` after confirming the SD card device with
 `lsblk`.
 
 The image is uniform across roles and across Pi 4 / Pi 5; per-Pi state
-is set by `/boot/eigsep-role.conf`. Today panda runs on a Pi 4 and
-backend on a Pi 5, but role is decoupled from hardware — either role
-can run on either Pi.
+is set by `/boot/firmware/eigsep-role.conf`. Today panda runs on a Pi 4
+and backend on a Pi 5, but role is decoupled from hardware — either
+role can run on either Pi.
 
 ## 3. Set the role on first boot
 
-Create `/boot/eigsep-role.conf` on the Pi's boot partition before
-first power-on:
+Create `/boot/firmware/eigsep-role.conf` on the Pi's boot partition
+before first power-on. (Trixie's pi-gen mounts the FAT boot partition
+at `/boot/firmware`; that's where it lands when the SD card is
+inspected from a desktop. Older `/boot/eigsep-role.conf` is also still
+honored for backward compatibility.) Contents:
 
 ```
 role = panda          # or "backend"
