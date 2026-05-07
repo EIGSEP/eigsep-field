@@ -103,3 +103,18 @@ fi
 # Field-capture output dir: operator-writable so `eigsep-field capture`
 # doesn't need sudo.
 install -d -m 0755 -o eigsep -g eigsep /opt/eigsep/captures
+
+# Operator navigation aids in /home/eigsep. Canonical paths stay under
+# /opt/eigsep (FHS, user-account-agnostic for systemd units, stable for
+# `eigsep-field patch`); the homedir gets symlinks so `ls ~`, `cd ~/src`,
+# and `cat ~/CHEATSHEET.md` work as expected without the operator
+# having to remember /opt/eigsep/. The symlinks resolve to existing
+# targets (captures dir was just created above; CHEATSHEET.md was
+# staged by 00-run.sh before the chroot install).
+ln -sfn /opt/eigsep/src           /home/eigsep/src
+ln -sfn /opt/eigsep/captures      /home/eigsep/captures
+ln -sfn /opt/eigsep/CHEATSHEET.md /home/eigsep/CHEATSHEET.md
+chown -h eigsep:eigsep \
+    /home/eigsep/src \
+    /home/eigsep/captures \
+    /home/eigsep/CHEATSHEET.md
