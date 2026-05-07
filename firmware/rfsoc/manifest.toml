@@ -6,6 +6,7 @@ asset   = "eigsep_vivaldi_2026-04-01.npz"
 source  = "https://github.com/EIGSEP/eigsep_dac"
 commit  = ""
 sha256  = ""
+roles   = ["backend"]
 
 # Notes:
 #   loader.py in this directory is VENDORED from eigsep_dac at the

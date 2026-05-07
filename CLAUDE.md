@@ -93,8 +93,12 @@ pre-built aarch64 wheels staged in the wheelhouse.
 
 To add one:
 
-1. Add `[hardware.<name>]` to `manifest.toml` with `version`, `tag`, and
-   `source` (git URL of the EIGSEP fork).
+1. Add `[hardware.<name>]` to `manifest.toml` with `version`, `tag`,
+   `source` (git URL of the EIGSEP fork), and `roles = [...]` listing
+   which Pi roles import the package at runtime (e.g. `["backend"]` for
+   casperfpga). `eigsep-field doctor` only requires the package to be
+   installed on Pis whose role appears in `roles`; on other Pis it's
+   reported as skipped. Omit `roles` to require it everywhere.
 2. `./scripts/build-wheelhouse.sh` will cross-build an aarch64 wheel via
    docker + qemu (`scripts/build-git-wheels.sh`) and emit
    `wheels/hardware-requirements.txt` with sha256 hashes.
@@ -103,6 +107,10 @@ To add one:
 4. Building requires docker + binfmt-registered qemu-user-static on the
    dev machine running the wheelhouse build. (Native builds are used
    when the host is already the target arch.)
+
+`[firmware.*]` entries take the same `roles = [...]` field with the
+same semantics — the doctor's firmware blob check is gated identically
+(e.g. the rfsoc bitstream is only required on backend).
 
 ## When adding a systemd service to the image
 
