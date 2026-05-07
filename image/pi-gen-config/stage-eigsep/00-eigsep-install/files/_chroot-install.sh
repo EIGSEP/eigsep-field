@@ -54,10 +54,25 @@ python3 -m venv /opt/eigsep/venv
     --require-hashes \
     -r /opt/eigsep/wheels/requirements.txt
 
+# Hardware-only Python packages (e.g. casperfpga) declared in
+# manifest.toml [hardware.*]. Mirrors install-field.sh:46-50. Required on
+# field Pis whose service code paths import them — eigsep-observe on the
+# backend lazy-imports casperfpga, so a missing wheel causes ImportError
+# at first boot. Skipping when hardware-requirements.txt is absent keeps
+# the image build resilient against wheelhouse builds that ran with no
+# [hardware.*] entries.
+if [ -f /opt/eigsep/wheels/hardware-requirements.txt ]; then
+    /opt/eigsep/venv/bin/pip install --no-index \
+        --find-links /opt/eigsep/wheels \
+        --require-hashes \
+        -r /opt/eigsep/wheels/hardware-requirements.txt
+fi
+
 ln -sf /opt/eigsep/venv/bin/eigsep-field /usr/local/bin/eigsep-field
 
 # Do not start isc-dhcp-server at image build time — only the one Pi
-# that's given `dhcp = true` in /boot/eigsep-role.conf should run it.
+# that's given `dhcp = true` in /boot/firmware/eigsep-role.conf should
+# run it.
 systemctl disable isc-dhcp-server.service || true
 
 # Mask systemd-timesyncd so it can't fight chrony for the clock. The
