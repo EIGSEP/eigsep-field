@@ -16,3 +16,4 @@ wheels/requirements.txt
 *.img
 *.img.tar.xz
 *.pem
+out/
