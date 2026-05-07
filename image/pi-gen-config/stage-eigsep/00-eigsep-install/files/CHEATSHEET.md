@@ -12,6 +12,12 @@ Everything you need is already on disk.
     /etc/eigsep/manifest.toml                 Blessed version tuple
     /opt/eigsep/captures/    Field diffs you've captured
 
+Homedir shortcuts (symlinks into /opt/eigsep):
+
+    ~/src           -> /opt/eigsep/src
+    ~/captures      -> /opt/eigsep/captures
+    ~/CHEATSHEET.md -> /opt/eigsep/CHEATSHEET.md
+
 ## Daily
 
     eigsep-field info                    blessed vs installed
