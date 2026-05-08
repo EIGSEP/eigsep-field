@@ -1,8 +1,10 @@
 """Tests for ``scripts/fetch_firmware.py`` build-time gate.
 
-A ``[firmware.*]`` entry with an empty ``tag`` field cannot be resolved
-to a Release asset; the script must fail the build rather than silently
-ship an image with the asset missing.
+The script must fail-fast (rc=1) for release builds (``--strict``) on a
+``[firmware.*]`` entry it can't resolve — a blessed image must never
+ship with the asset missing. DEV builds (default) warn-and-continue
+(rc=0) so iteration isn't blocked while a sibling firmware repo hasn't
+tagged yet.
 """
 
 from __future__ import annotations
@@ -26,7 +28,7 @@ def _load_module():
     return mod
 
 
-def test_missing_tag_fails(tmp_path: Path, capsys) -> None:
+def _write_unresolvable_manifest(tmp_path: Path) -> Path:
     manifest = tmp_path / "manifest.toml"
     manifest.write_text(
         "[firmware.thing]\n"
@@ -34,21 +36,45 @@ def test_missing_tag_fails(tmp_path: Path, capsys) -> None:
         'source  = "https://github.com/example/thing"\n'
         'tag     = ""\n'
     )
+    return manifest
+
+
+def test_missing_tag_strict_fails(tmp_path: Path, capsys) -> None:
+    manifest = _write_unresolvable_manifest(tmp_path)
+    out_root = tmp_path / "out"
+
+    fetch = _load_module()
+    rc = fetch.main(
+        ["fetch_firmware.py", str(manifest), str(out_root), "--strict"]
+    )
+
+    assert rc == 1
+    err = capsys.readouterr().err
+    assert "thing" in err
+    assert "error" in err.lower()
+
+
+def test_missing_tag_lenient_warns(tmp_path: Path, capsys) -> None:
+    """Default (no --strict) lets DEV image builds complete despite an
+    unresolvable entry, but the warning must surface in stderr so a
+    careless release dispatch is still visible to whoever reads logs.
+    """
+    manifest = _write_unresolvable_manifest(tmp_path)
     out_root = tmp_path / "out"
 
     fetch = _load_module()
     rc = fetch.main(["fetch_firmware.py", str(manifest), str(out_root)])
 
-    assert rc == 1
+    assert rc == 0
     err = capsys.readouterr().err
     assert "thing" in err
-    assert "tag" in err.lower()
+    assert "warning" in err.lower()
 
 
 def test_empty_firmware_section_is_ok(tmp_path: Path) -> None:
-    """A manifest with no [firmware.*] entries must succeed (rc=0).
+    """A manifest with no [firmware.*] entries succeeds in either mode.
 
-    The fail-fast applies to entries that exist but can't resolve, not to
+    The gate applies to entries that exist but can't resolve, not to
     the absence of entries.
     """
     manifest = tmp_path / "manifest.toml"
@@ -56,5 +82,15 @@ def test_empty_firmware_section_is_ok(tmp_path: Path) -> None:
     out_root = tmp_path / "out"
 
     fetch = _load_module()
-    rc = fetch.main(["fetch_firmware.py", str(manifest), str(out_root)])
-    assert rc == 0
+    assert fetch.main(["fetch_firmware.py", str(manifest), str(out_root)]) == 0
+    assert (
+        fetch.main(
+            [
+                "fetch_firmware.py",
+                str(manifest),
+                str(out_root),
+                "--strict",
+            ]
+        )
+        == 0
+    )

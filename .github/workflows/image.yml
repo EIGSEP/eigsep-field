@@ -77,27 +77,13 @@ jobs:
           gh run download "$run_id" --name wheels-linux_aarch64 --dir /tmp/wheels
           tar -C image/pi-gen-config/stage-eigsep/00-eigsep-install/files/wheels \
               -xJf /tmp/wheels/wheels-linux_aarch64.tar.xz
-      - name: Pull firmware blobs referenced in manifest
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          python3 scripts/fetch_firmware.py manifest.toml \
-              image/pi-gen-config/stage-eigsep/00-eigsep-install/files/firmware
-      - name: Stage manifest.toml for stage-eigsep
-        # 00-run.sh installs this to /etc/eigsep/manifest.toml in the
-        # rootfs and reads its [release] field for the motd/cheatsheet
-        # substitution. Pi-gen never sees the repo root, so copy it into
-        # the sub-stage's files/ tree where the install script expects it.
-        run: |
-          install -d image/pi-gen-config/stage-eigsep/00-eigsep-install/files/etc-eigsep
-          install -m 0644 manifest.toml \
-              image/pi-gen-config/stage-eigsep/00-eigsep-install/files/etc-eigsep/manifest.toml
       - name: Compute build channel
         # Blessed = the trigger is a tag push AND the tag matches
         # f"v{manifest['release']}". Anything else (workflow_dispatch,
         # rc-style tag, hotfix-test tag) is DEV. The release-upload step
-        # is gated on this; the rootfs gets a [image] dev marker in the
-        # next step so motd/info display "DEV BUILD <sha>".
+        # is gated on this; the rootfs gets a [image] dev marker in a
+        # later step so motd/info display "DEV BUILD <sha>". Computed
+        # early so fetch_firmware below can gate its --strict mode on it.
         run: |
           RELEASE=$(python3 -c "import tomllib; print(tomllib.load(open('manifest.toml','rb'))['release'])")
           EXPECTED_REF="refs/tags/v${RELEASE}"
@@ -111,6 +97,30 @@ jobs:
           echo "BUILD_SHA=${BUILD_SHA}" >> "$GITHUB_ENV"
           echo "MANIFEST_RELEASE=${RELEASE}" >> "$GITHUB_ENV"
           echo "channel: IS_BLESSED=${IS_BLESSED} BUILD_SHA=${BUILD_SHA} ref=${GITHUB_REF} expected=${EXPECTED_REF}"
+      - name: Pull firmware blobs referenced in manifest
+        # --strict only on blessed builds: a release must never ship with
+        # a firmware blob missing. DEV (workflow_dispatch on a SHA where
+        # a sibling firmware repo hasn't tagged yet) warns and continues
+        # so iteration on the lab Pi isn't blocked on upstream tagging;
+        # the operator scp's any missing blob onto the test Pi.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          STRICT=""
+          if [ "${IS_BLESSED}" = "true" ]; then
+              STRICT="--strict"
+          fi
+          python3 scripts/fetch_firmware.py $STRICT manifest.toml \
+              image/pi-gen-config/stage-eigsep/00-eigsep-install/files/firmware
+      - name: Stage manifest.toml for stage-eigsep
+        # 00-run.sh installs this to /etc/eigsep/manifest.toml in the
+        # rootfs and reads its [release] field for the motd/cheatsheet
+        # substitution. Pi-gen never sees the repo root, so copy it into
+        # the sub-stage's files/ tree where the install script expects it.
+        run: |
+          install -d image/pi-gen-config/stage-eigsep/00-eigsep-install/files/etc-eigsep
+          install -m 0644 manifest.toml \
+              image/pi-gen-config/stage-eigsep/00-eigsep-install/files/etc-eigsep/manifest.toml
       - name: Stamp DEV marker on staged manifest
         # Append a [image] block that 00-run.sh and `eigsep-field info`
         # render as "*** DEV BUILD <sha> ***" so a non-blessed image
