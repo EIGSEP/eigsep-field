@@ -58,10 +58,24 @@ abs_out=$(cd "$OUT" && pwd)
 constraints="$abs_out/.constraints.txt"
 if [[ -f "$abs_out/requirements.txt" ]]; then
     python3 - "$abs_out/requirements.txt" "$constraints" <<'PY'
-import re, sys
-src = open(sys.argv[1]).read()
-out = re.sub(r"\s*\\\n\s*--hash=sha256:[a-f0-9]+\n?", "\n", src)
-open(sys.argv[2], "w").write(out)
+import sys
+
+src_lines = open(sys.argv[1]).read().splitlines(keepends=True)
+out_lines = []
+
+for line in src_lines:
+    if line.lstrip().startswith("--hash="):
+        if out_lines and out_lines[-1].rstrip().endswith("\\"):
+            prev = out_lines[-1]
+            newline = "\n" if prev.endswith("\n") else ""
+            prev = prev[:-1] if newline else prev
+            if prev.endswith("\\"):
+                prev = prev[:-1]
+            out_lines[-1] = prev.rstrip() + newline
+        continue
+    out_lines.append(line)
+
+open(sys.argv[2], "w").write("".join(out_lines))
 PY
 else
     : > "$constraints"
