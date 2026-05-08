@@ -17,6 +17,42 @@ repos — see `docs/interface/README.md` for the permalink index. When an ICD
 doc in this repo describes a shape, it must permalink (pinned git SHA) to the
 authoritative source.
 
+## Topology / what runs where
+
+Standing facts about which Pi runs what and what each Pi is wired to.
+Past sessions have gotten confused on each of these — restating them
+here so they're visible before you go grep manifest comments.
+
+- **panda Pi** (Pi 4 today; role is decoupled from hardware). Runs
+  `picomanager.service` and `cmtvna.service`. It connects to the
+  Pico(s) over USB and is the host that flashes them — that's why
+  `[firmware.pico]` is gated `roles = ["panda"]`. The CMT VNA is also
+  attached to this Pi.
+
+- **backend Pi** (Pi 5 today). Runs `eigsep-observe.service`,
+  `eigsep-observe-writer.service`, and `redis-server`.
+  - It connects to the **SNAP** board and reads correlator data from
+    it. `casperfpga` is the SNAP driver and is **required** on
+    backend — `[hardware.casperfpga]` has `roles = ["backend"]`. The
+    "ground stack lazy-imports it" wording elsewhere in this file is
+    about keeping CI/dev slim; on a real backend Pi, missing
+    `casperfpga` is an image-build bug, not doctor noise.
+  - It is **always colocated with the dhcp-master role.** There is
+    no standalone dhcp-master Pi in this deployment. The backend Pi
+    sets `role = backend` AND `dhcp = true` in
+    `/boot/firmware/eigsep-role.conf`. The `role = "dhcp-master"`
+    string used in `[services.*]` is the activation keyword for
+    services that turn on when `dhcp = true` — it is not a role you
+    set in `eigsep-role.conf`.
+
+- **RFSoC** is a separate standalone system. It is **not** a Pi and
+  does **not** run the eigsep image. The backend Pi holds the
+  bitstream `.npz` at `/opt/eigsep/firmware/rfsoc/` and pushes it to
+  the RFSoC over the network. `firmware/rfsoc/loader.py` is vendored
+  from `eigsep_dac` as reference payload; `eigsep_dac` itself is not
+  part of the pip-installable stack and intentionally so — its code
+  lands on the Pi mostly as reference, not as a runtime dep.
+
 ## Where to look in siblings
 
 - **Key registry** — `eigsep_redis/src/eigsep_redis/keys.py` plus
