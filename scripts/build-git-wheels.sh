@@ -48,6 +48,39 @@ fi
 mkdir -p "$OUT"
 abs_out=$(cd "$OUT" && pwd)
 
+# Strip --hash continuations from the main requirements.txt to produce a
+# constraints file pip wheel will accept without flipping into
+# --require-hashes mode (which it does whenever it sees a hash in any
+# input file). Hardware-package transitive deps that happen to overlap
+# with the main resolve (e.g. redis, IPython) get pinned to the
+# main-resolve version this way; non-overlapping deps (katcp, tornado,
+# tftpy, …) are pulled at whatever pip resolves naturally.
+constraints="$abs_out/.constraints.txt"
+if [[ -f "$abs_out/requirements.txt" ]]; then
+    python3 - "$abs_out/requirements.txt" "$constraints" <<'PY'
+import sys
+
+src_lines = open(sys.argv[1]).read().splitlines(keepends=True)
+out_lines = []
+
+for line in src_lines:
+    if line.lstrip().startswith("--hash="):
+        if out_lines and out_lines[-1].rstrip().endswith("\\"):
+            prev = out_lines[-1]
+            newline = "\n" if prev.endswith("\n") else ""
+            prev = prev[:-1] if newline else prev
+            if prev.endswith("\\"):
+                prev = prev[:-1]
+            out_lines[-1] = prev.rstrip() + newline
+        continue
+    out_lines.append(line)
+
+open(sys.argv[2], "w").write("".join(out_lines))
+PY
+else
+    : > "$constraints"
+fi
+
 host_arch=$(uname -m)
 cross=0
 if [[ "$host_arch" != "$target_uname" ]]; then
@@ -68,6 +101,12 @@ for line in "${entries[@]}"; do
         continue
     fi
 
+    # No --no-deps: hardware packages carry transitive PyPI deps
+    # (casperfpga -> katcp, tornado, tftpy, future, …) that the chroot
+    # installer has to find offline in /opt/eigsep/wheels. pip wheel
+    # builds the hardware package itself plus downloads/builds wheels
+    # for every transitive dep into $OUT, constrained against the main
+    # resolve so overlapping packages (redis, IPython, …) stay aligned.
     url="${source%.git}.git@${tag}"
     if [[ $cross -eq 1 ]]; then
         docker run --rm --platform "$docker_platform" \
@@ -76,10 +115,12 @@ for line in "${entries[@]}"; do
             bash -c "set -e; \
                 apt-get update -q; \
                 DEBIAN_FRONTEND=noninteractive apt-get install -y -q --no-install-recommends git gcc build-essential; \
-                pip wheel --no-deps --wheel-dir /out 'git+${url}'"
+                pip wheel --constraint /out/.constraints.txt --wheel-dir /out 'git+${url}'"
     else
-        pip wheel --no-deps --wheel-dir "$abs_out" "git+${url}"
+        pip wheel --constraint "$constraints" --wheel-dir "$abs_out" "git+${url}"
     fi
 done
+
+rm -f "$constraints"
 
 echo "build-git-wheels: done"

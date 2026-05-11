@@ -62,8 +62,14 @@ sha256  = ""
 # by panda or dhcp-master service code paths. The `roles` gate keeps
 # `eigsep-field doctor` from flagging it missing on Pis that don't
 # import it.
-version = "0.7.1"
-tag     = "v0.7.1"
+#
+# 0.7.2 relaxes the stale `redis<7` install_requires cap that previously
+# conflicted with the main resolve's `redis==7.4.0` and broke
+# `pip install --require-hashes -r hardware-requirements.txt` in the
+# image chroot. Drops `future<2` (never imported in source; still pulled
+# transitively by katcp). See EIGSEP/casperfpga PR for the audit.
+version = "0.7.2"
+tag     = "v0.7.2"
 source  = "https://github.com/EIGSEP/casperfpga"
 roles   = ["backend"]
 
