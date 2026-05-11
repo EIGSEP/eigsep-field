@@ -30,6 +30,30 @@ is set by `/boot/firmware/eigsep-role.conf`. Today panda runs on a Pi 4
 and backend on a Pi 5, but role is decoupled from hardware — either
 role can run on either Pi.
 
+## 2.5. (Pi 5 only) Install the RTC coin cell
+
+The Pi 5 has an onboard RTC chip but it only persists across power
+cycles if a CR1220 coin cell is installed on the J5 header. Without
+it, the Pi 5 behaves like the Pi 4 — no real RTC, and on boot the
+clock comes from the last `fake-hwclock` value (i.e. last shutdown
+time, which the rest of the cluster will then agree on for the
+session). For any deployment where wall-clock accuracy matters, fit
+the cell at commissioning time.
+
+After installing the cell and booting the Pi with a correct system
+clock (e.g. while still on a network with chrony reaching public NTP),
+write the time to the RTC once:
+
+```
+sudo hwclock --systohc
+sudo hwclock --show          # confirm reads back as wall time
+```
+
+From then on, `chrony`'s `rtcsync` directive keeps the RTC tracking
+the disciplined system clock automatically. See `laptop.md` for how
+the coin cell and the operator laptop combine to give the cluster its
+time discipline.
+
 ## 3. Set the role on first boot
 
 Create `/boot/firmware/eigsep-role.conf` on the Pi's boot partition
