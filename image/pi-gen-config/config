@@ -20,4 +20,15 @@ TIMEZONE_DEFAULT="Etc/UTC"
 # build, provide FIRST_USER_PASS explicitly (or rotate the secret and
 # use the new value); GitHub secrets cannot be retrieved locally.
 : "${FIRST_USER_PASS:?FIRST_USER_PASS must be set explicitly for local/manual builds or injected by CI.}"
+# Suppress pi-gen's first-boot user-rename wizard. Without this, pi-gen's
+# export-image/01-user-rename step runs `rename-user -f -s`, which
+# unconditionally enables userconfig.service and disables getty@tty1 —
+# the userconfig wizard then prompts on tty1 for a username + password on
+# first boot, blocking headless SSH (and the dhcp-master role, which only
+# activates after first boot completes). FIRST_USER_NAME=eigsep with
+# FIRST_USER_PASS from the secret is the intended fleet-wide login, so
+# the rename is undesirable here. pi-gen's build.sh asserts
+# FIRST_USER_PASS is set when this flag is 1, which is already enforced
+# above.
+DISABLE_FIRST_BOOT_USER_RENAME=1
 STAGE_LIST="stage0 stage1 stage2 stage-eigsep"
