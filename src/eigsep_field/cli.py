@@ -349,9 +349,7 @@ def _cmd_services(args: argparse.Namespace) -> int:
     services = manifest.get("services", {})
     if args.action == "list":
         role_cfg = parse_role_file(ROLE_FILE)
-        expected = {
-            n for n, _ in services_for_role(services, role_cfg.role)
-        }
+        expected = {n for n, _ in services_for_role(services, role_cfg.role)}
         hdr = f"{'name':<24} {'unit':<32} {'scope':<20} {'state':<20}"
         print(hdr)
         print("-" * len(hdr))

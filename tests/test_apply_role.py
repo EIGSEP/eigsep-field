@@ -136,9 +136,7 @@ def test_does_not_touch_dhcpcd_conf(tmp_path, fake_nmcli, monkeypatch):
 
     monkeypatch.setattr(cli, "systemctl", _systemctl)
 
-    rc = cli._apply_role_static_ip(
-        RoleConfig(role="backend"), nm_dir=tmp_path
-    )
+    rc = cli._apply_role_static_ip(RoleConfig(role="backend"), nm_dir=tmp_path)
     assert rc == 0
     # No dhcpcd.service interaction.
     for call in systemctl_calls:
