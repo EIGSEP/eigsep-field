@@ -288,7 +288,7 @@ jobs:
         # Always uploaded so DEV builds are downloadable for QA. For
         # blessed builds this is a redundant copy of the Release assets,
         # at the cost of a few minutes of CI artifact storage.
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: eigsep-field-image
           path: |

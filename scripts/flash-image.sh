@@ -19,7 +19,7 @@
 # works regardless of pi-gen's date-stamp without needing a pinned asset
 # name in manifest.toml. Both source modes produce the same flat layout
 # in dest-dir because image.yml uploads only `out/*.part.*` /
-# `out/*.sha256` and upload-artifact@v4 strips the common `out/` prefix.
+# `out/*.sha256` and upload-artifact strips the common `out/` prefix.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
