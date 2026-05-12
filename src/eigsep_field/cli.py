@@ -389,8 +389,12 @@ def _cmd_services(args: argparse.Namespace) -> int:
     unit = services[args.name]["unit"]
 
     if args.action == "status":
-        rc, _ = systemctl("status", unit, "--no-pager")
-        return rc
+        # Stream directly to the terminal — the `systemctl()` helper
+        # captures stdout/stderr (right for is_active / unit_health, wrong
+        # for an interactive status dump that the operator needs to read).
+        return subprocess.run(
+            ["systemctl", "status", unit, "--no-pager"]
+        ).returncode
     if args.action == "restart":
         rc, msg = systemctl("restart", unit)
         if rc != 0:
