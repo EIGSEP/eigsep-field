@@ -1,6 +1,6 @@
 [Unit]
-Description=EIGSEP backend role (digital backend: SNAP + observe + observe-writer)
-Wants=redis-server.service eigsep-observe.service eigsep-observe-writer.service
+Description=EIGSEP backend role (digital backend + DHCP server)
+Wants=redis-server.service eigsep-observe.service eigsep-observe-writer.service isc-dhcp-server.service
 After=network-online.target
 
 [Install]

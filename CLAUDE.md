@@ -30,20 +30,20 @@ here so they're visible before you go grep manifest comments.
   attached to this Pi.
 
 - **backend Pi** (Pi 5 today). Runs `eigsep-observe.service`,
-  `eigsep-observe-writer.service`, and `redis-server`.
+  `eigsep-observe-writer.service`, `redis-server`, and the LAN's
+  `isc-dhcp-server`.
   - It connects to the **SNAP** board and reads correlator data from
     it. `casperfpga` is the SNAP driver and is **required** on
     backend — `[hardware.casperfpga]` has `roles = ["backend"]`. The
     "ground stack lazy-imports it" wording elsewhere in this file is
     about keeping CI/dev slim; on a real backend Pi, missing
     `casperfpga` is an image-build bug, not doctor noise.
-  - It is **always colocated with the dhcp-master role.** There is
-    no standalone dhcp-master Pi in this deployment. The backend Pi
-    sets `role = backend` AND `dhcp = true` in
-    `/boot/firmware/eigsep-role.conf`. The `role = "dhcp-master"`
-    string used in `[services.*]` is the activation keyword for
-    services that turn on when `dhcp = true` — it is not a role you
-    set in `eigsep-role.conf`.
+  - It is the LAN's DHCP server and NTP server by definition: the
+    backend role pins eth0 to `10.10.10.10/24` (via
+    `ROLE_STATIC_IPS` in `src/eigsep_field/cli.py`) and enables
+    `isc-dhcp-server.service` / serves chrony's `server.conf`.
+    `eigsep-role.conf` is just `role = backend` — there is no
+    separate `dhcp =` flag.
 
 - **RFSoC** is a separate standalone system. It is **not** a Pi and
   does **not** run the eigsep image. The backend Pi holds the
@@ -164,15 +164,15 @@ uniform across Pis; per-Pi differentiation is the role set in
    - `activation` — `"always"` (enabled on every Pi at build time) or
      `"role"` (enabled on first boot when `/boot/firmware/eigsep-role.conf`
      matches).
-   - `role` — required when `activation = "role"`. One of `"panda"`,
-     `"backend"`, or `"dhcp-master"`.
+   - `role` — required when `activation = "role"`. One of `"panda"` or
+     `"backend"`.
    - `source` / `tag` / `source_path` — required for `kind = "sibling"`;
      tag must match the corresponding `[packages.*].tag`.
 2. For `kind = "local"` or `kind = "sibling"`, drop the unit file (adapted
    for the image's `/opt/eigsep/venv` layout) in
    `image/pi-gen-config/stage-eigsep/00-eigsep-install/files/systemd/`.
-3. For role services, update the role's `.target` (`eigsep-panda.target`,
-   `eigsep-backend.target`, `eigsep-dhcp.target`) to `Wants=` the new unit.
+3. For role services, update the role's `.target` (`eigsep-panda.target`
+   or `eigsep-backend.target`) to `Wants=` the new unit.
 4. For `kind = "sibling"`, add a permalink row in
    `docs/interface/README.md` under the Systemd services section.
 5. Run `python3 scripts/check_services_drift.py` to confirm tag alignment

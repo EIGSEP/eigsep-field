@@ -15,49 +15,27 @@ from pathlib import Path
 ROLE_FILE = Path("/etc/eigsep/role")
 
 # Operator-supplied role config dropped on the SD card's FAT boot
-# partition. Trixie's pi-gen mounts that partition at /boot/firmware
-# (preferred); older Bullseye/Bookworm SDs mounted it at /boot.
-# resolve_boot_role_conf() returns whichever exists, preferring the
-# Trixie path.
-BOOT_ROLE_CONF_CANDIDATES: tuple[Path, ...] = (
-    Path("/boot/firmware/eigsep-role.conf"),
-    Path("/boot/eigsep-role.conf"),
-)
+# partition. Trixie's pi-gen mounts that partition at /boot/firmware.
+BOOT_ROLE_CONF = Path("/boot/firmware/eigsep-role.conf")
 
 KNOWN_ROLES = {"panda", "backend"}
-
-
-def resolve_boot_role_conf(
-    candidates: tuple[Path, ...] = BOOT_ROLE_CONF_CANDIDATES,
-) -> Path:
-    """Return the first existing candidate, or candidates[0] if none exist.
-
-    Returning the preferred path on miss (rather than ``None``) keeps
-    error messages pointed at the canonical location.
-    """
-    for c in candidates:
-        if c.exists():
-            return c
-    return candidates[0]
 
 
 @dataclass(frozen=True)
 class RoleConfig:
     role: str | None
-    dhcp: bool
 
 
 def parse_role_file(path: Path) -> RoleConfig:
-    """Parse ``role = <name>`` / ``dhcp = <bool>`` from a text file.
+    """Parse ``role = <name>`` from a text file.
 
     Same format for ``/boot/firmware/eigsep-role.conf`` (operator input) and
     ``/etc/eigsep/role`` (applied state). Missing file → empty config
-    (callers decide whether that's an error).
+    (callers decide whether that's an error). Unknown keys are ignored.
     """
     role: str | None = None
-    dhcp = False
     if not path.exists():
-        return RoleConfig(role=None, dhcp=False)
+        return RoleConfig(role=None)
     for raw in path.read_text().splitlines():
         line = raw.strip()
         if not line or line.startswith("#"):
@@ -66,22 +44,22 @@ def parse_role_file(path: Path) -> RoleConfig:
             continue
         k, _, v = line.partition("=")
         key = k.strip().lower()
-        val = v.strip().strip('"').strip("'").lower()
+        value = v.strip()
+        for marker in ("#", ";"):
+            value = value.split(marker, 1)[0].strip()
+        val = value.strip('"').strip("'").lower()
         if key == "role":
             role = val or None
-        elif key == "dhcp":
-            dhcp = val in ("true", "yes", "on", "1")
-    return RoleConfig(role=role, dhcp=dhcp)
+    return RoleConfig(role=role)
 
 
 def services_for_role(
-    services: dict, role: str | None, dhcp: bool
+    services: dict, role: str | None
 ) -> list[tuple[str, dict]]:
     """Return service entries that should be enabled on this Pi.
 
     Always services are always included. Role services match ``role``
-    (or ``dhcp == True`` for the ``dhcp-master`` role). Order preserved
-    from the manifest.
+    exactly. Order preserved from the manifest.
     """
     out: list[tuple[str, dict]] = []
     for name, entry in services.items():
@@ -91,11 +69,7 @@ def services_for_role(
             continue
         if activation != "role":
             continue
-        entry_role = entry.get("role")
-        if entry_role == "dhcp-master":
-            if dhcp:
-                out.append((name, entry))
-        elif entry_role == role:
+        if entry.get("role") == role:
             out.append((name, entry))
     return out
 

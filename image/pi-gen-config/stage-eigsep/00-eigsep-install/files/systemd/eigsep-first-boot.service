@@ -5,13 +5,9 @@ Description=EIGSEP first-boot role selector
 # editing the role file and `systemctl enable eigsep-first-boot.service;
 # reboot` re-rolls the Pi.
 #
-# The role conf lives on the SD card's FAT boot partition. Trixie's pi-gen
-# mounts it at /boot/firmware (preferred); older Bullseye/Bookworm SDs
-# mounted it at /boot. The "|"-prefixed conditions form a logical OR, so
-# either path triggers the unit. eigsep-field _apply-role (no positional
-# arg) resolves the same candidates internally.
-ConditionPathExists=|/boot/firmware/eigsep-role.conf
-ConditionPathExists=|/boot/eigsep-role.conf
+# The role conf lives on the SD card's FAT boot partition, which Trixie's
+# pi-gen mounts at /boot/firmware.
+ConditionPathExists=/boot/firmware/eigsep-role.conf
 After=multi-user.target
 Wants=network-online.target
 

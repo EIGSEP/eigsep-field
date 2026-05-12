@@ -34,8 +34,8 @@ permalink below.
 
 `redis-server` and `isc-dhcp-server` are apt-provided (no unit file
 shipped here). `eigsep-panda.service` and the role targets
-(`eigsep-panda.target`, `eigsep-backend.target`, `eigsep-dhcp.target`)
-plus `eigsep-first-boot.service` are eigsep-field-owned — no sibling
+(`eigsep-panda.target`, `eigsep-backend.target`) plus
+`eigsep-first-boot.service` are eigsep-field-owned — no sibling
 authority, no drift tracking.
 
 ## Structure of each doc

@@ -1,6 +1,6 @@
 # Operator laptop capabilities
 
-The Pi image runs `chrony` on every Pi: the dhcp-master serves NTP on
+The Pi image runs `chrony` on every Pi: the backend Pi serves NTP on
 the LAN with `local stratum 10` as a fallback so clients agree on time
 even when no upstream is reachable. Whether that agreed time is
 anchored to real wall-clock UTC depends on two independent pieces of
@@ -16,7 +16,7 @@ field hardware:
 - **Laptop on the LAN.** A laptop's battery-backed RTC plus any
   recent internet discipline makes it a much better NTP source than a
   Pi without a coin cell, and a true-UTC source when it's online. The
-  dhcp-master treats `10.10.10.17` as its preferred upstream.
+  backend Pi treats `10.10.10.17` as its preferred upstream.
 
 Neither is strictly required for the cluster to come up and observe —
 the `local stratum 10` fallback ensures internal agreement either way.
@@ -28,20 +28,20 @@ true-UTC ceiling.
 
 | Address       | Host                                      |
 |---------------|-------------------------------------------|
-| `10.10.10.10` | ground / dhcp-master Pi (published entry) |
+| `10.10.10.10` | backend Pi (published entry; DHCP + NTP server) |
 | `10.10.10.11` | panda Pi                                  |
 | `10.10.10.12` | active SNAP board (spare-only; both units same IP) |
 | `10.10.10.17` | operator laptop (any laptop, static)      |
 | `.20`–`.255`  | DHCP dynamic pool                         |
 
 `10.10.10.10` is the address collaborators should know — it's the
-ground Pi.
+backend Pi.
 
 ## What the laptop needs
 
 - **Wired Ethernet on the EIGSEP LAN.**
 - **Static IP `10.10.10.17/24` on that interface, no DHCP.** The
-  ground Pi does not reserve `.17` by MAC, so a DHCP-leased laptop
+  backend Pi does not reserve `.17` by MAC, so a DHCP-leased laptop
   would land at a random `.20`+ address. Configuring `.17` statically
   is what makes any laptop swap into `chrony`'s expected upstream
   address — if your laptop dies in the field, a backup laptop that
@@ -63,10 +63,10 @@ ground Pi.
 
   **Do not** add a `local stratum N` line on the laptop. If the
   laptop is offline (no recent UTC discipline), letting it serve at
-  some fixed stratum anyway would cause the dhcp-master Pi to prefer
+  some fixed stratum anyway would cause the backend Pi to prefer
   the laptop's potentially stale clock over its own coin-cell-backed
   RTC. The right behavior is: laptop reports stratum 16 when
-  unsynchronized → dhcp-master ignores it → Pi falls back to its own
+  unsynchronized → backend ignores it → Pi falls back to its own
   RTC via `local stratum 10`.
 
 ## Verifying time discipline
@@ -78,7 +78,7 @@ chronyc sources              # at least one public NTP ^*-selected
 sudo ss -ulnp | grep :123    # chronyd listening on UDP/123 on 10.10.10.17
 ```
 
-On the dhcp-master Pi (with the laptop on the LAN):
+On the backend Pi (with the laptop on the LAN):
 
 ```
 chronyc sources -v           # 10.10.10.17 selected (^*) with stratum < 10

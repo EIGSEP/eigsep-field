@@ -33,7 +33,7 @@ done
 
 # Stage chrony role snippets. eigsep-first-boot.service symlinks the
 # correct one into /etc/chrony/conf.d/eigsep.conf based on whether
-# /boot/firmware/eigsep-role.conf has dhcp = true (server) or not (client).
+# /boot/firmware/eigsep-role.conf has role = backend (server) or not (client).
 install -d "${ROOTFS_DIR}/etc/eigsep/chrony"
 for conf in files/chrony/*.conf; do
     [ -f "$conf" ] || continue
@@ -46,8 +46,8 @@ done
 # chroot's apt-get install isc-dhcp-server, which fails under
 # noninteractive apt with "end of file on stdin at conffile prompt".
 # _chroot-install.sh copies these into place after apt returns. Inert
-# on Pis that don't have dhcp = true in /boot/firmware/eigsep-role.conf —
-# isc-dhcp-server is role-scoped to dhcp-master.
+# on Pis without role = backend in /boot/firmware/eigsep-role.conf —
+# isc-dhcp-server is role-scoped to backend.
 install -d "${ROOTFS_DIR}/opt/eigsep/dhcp"
 install -m 0644 files/dhcp/dhcpd.conf \
     "${ROOTFS_DIR}/opt/eigsep/dhcp/dhcpd.conf"
