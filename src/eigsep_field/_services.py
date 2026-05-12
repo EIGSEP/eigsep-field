@@ -44,7 +44,10 @@ def parse_role_file(path: Path) -> RoleConfig:
             continue
         k, _, v = line.partition("=")
         key = k.strip().lower()
-        val = v.strip().strip('"').strip("'").lower()
+        value = v.strip()
+        for marker in ("#", ";"):
+            value = value.split(marker, 1)[0].strip()
+        val = value.strip('"').strip("'").lower()
         if key == "role":
             role = val or None
     return RoleConfig(role=role)
