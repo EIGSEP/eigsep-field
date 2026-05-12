@@ -8,10 +8,15 @@ drifts back onto a personal machine.
 
 Each Pi runs one role:
 
-- `panda` — observing front-end (picohost, cmtvna, etc).
-- `backend` — Redis + observer.
-- One Pi additionally has `dhcp = true`, making it the LAN's
-  dhcp-master and NTP server. Today this is the ground Pi.
+- `panda` — observing front-end (picohost, cmtvna, etc). Pinned to
+  `10.10.10.11`.
+- `backend` — Redis + observer + LAN's DHCP + NTP server. Pinned to
+  `10.10.10.10`. Exactly one per LAN.
+
+The role-applier pins eth0 to the role's static IP (see
+`ROLE_STATIC_IPS` in `src/eigsep_field/cli.py`), so a fresh Pi is
+reachable at its conventional address from first boot — no
+DHCP-reservation-by-MAC step required.
 
 ## 2. Flash the latest image
 
@@ -64,43 +69,13 @@ honored for backward compatibility.) Contents:
 
 ```
 role = panda          # or "backend"
-dhcp = false          # or "true" on exactly one Pi per LAN
 ```
 
 `eigsep-first-boot.service` reads it on first boot, enables the
-matching services, pins eth0 to `10.10.10.10/24` if `dhcp = true`,
-and self-disables.
+matching services, pins eth0 to the role's static IP, and
+self-disables.
 
-## 4. Capture the MAC and reserve the IP
-
-**This is the step easy to forget when sourcing hardware.** Boot the
-Pi onto the LAN once, then:
-
-```
-# On the dhcp-master:
-journalctl -u isc-dhcp-server | grep DHCPACK | tail
-# or:
-arp -an | grep 10.10.10.
-```
-
-Capture the new Pi's MAC. Then add (or uncomment) the reservation in
-[`image/pi-gen-config/stage-eigsep/00-eigsep-install/files/dhcp/dhcpd.conf`](../../image/pi-gen-config/stage-eigsep/00-eigsep-install/files/dhcp/dhcpd.conf):
-
-```
-host panda {
-  hardware ethernet AA:BB:CC:DD:EE:FF;
-  fixed-address 10.10.10.11;
-}
-```
-
-Open a PR with the change. After merge, rebuild the image at the next
-release; the Pi will land at its conventional address from then on.
-
-(Until the reservation is merged + redeployed, the Pi will get a
-dynamic-pool address `.20`+ and other code that expects to reach it
-at the conventional address won't work.)
-
-## 5. Verify
+## 4. Verify
 
 On the new Pi:
 
@@ -110,21 +85,19 @@ eigsep-field doctor     # role + service health
 eigsep-field services list
 ```
 
-On the dhcp-master, confirm the new Pi got its expected lease:
-
-```
-journalctl -u isc-dhcp-server -f
-```
+From the operator laptop or backend Pi, confirm reachability at the
+conventional address (`10.10.10.10` for backend, `10.10.10.11` for
+panda).
 
 ## Address conventions
 
-See [`laptop.md`](laptop.md) for the full table. The Pi reservations
+See [`laptop.md`](laptop.md) for the full table. The Pi assignments
 relevant here:
 
-| Address       | Host                                  |
-|---------------|---------------------------------------|
-| `10.10.10.10` | ground / dhcp-master Pi (static)      |
-| `10.10.10.11` | panda Pi (DHCP reservation)           |
+| Address       | Host                                       |
+|---------------|--------------------------------------------|
+| `10.10.10.10` | backend Pi (role-pinned static)            |
+| `10.10.10.11` | panda Pi (role-pinned static)              |
 | `10.10.10.12` | active SNAP board (DHCP reservation; both physical units share this address — spare-only, never powered simultaneously) |
 
 `.10` is the published entry point. Collaborators reach the system

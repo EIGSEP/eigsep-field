@@ -44,20 +44,20 @@ def resolve_boot_role_conf(
 @dataclass(frozen=True)
 class RoleConfig:
     role: str | None
-    dhcp: bool
 
 
 def parse_role_file(path: Path) -> RoleConfig:
-    """Parse ``role = <name>`` / ``dhcp = <bool>`` from a text file.
+    """Parse ``role = <name>`` from a text file.
 
     Same format for ``/boot/firmware/eigsep-role.conf`` (operator input) and
     ``/etc/eigsep/role`` (applied state). Missing file → empty config
-    (callers decide whether that's an error).
+    (callers decide whether that's an error). Unknown keys (including
+    the legacy ``dhcp =`` line) are ignored so old role files on
+    pre-existing SD cards don't break first-boot.
     """
     role: str | None = None
-    dhcp = False
     if not path.exists():
-        return RoleConfig(role=None, dhcp=False)
+        return RoleConfig(role=None)
     for raw in path.read_text().splitlines():
         line = raw.strip()
         if not line or line.startswith("#"):
@@ -69,19 +69,16 @@ def parse_role_file(path: Path) -> RoleConfig:
         val = v.strip().strip('"').strip("'").lower()
         if key == "role":
             role = val or None
-        elif key == "dhcp":
-            dhcp = val in ("true", "yes", "on", "1")
-    return RoleConfig(role=role, dhcp=dhcp)
+    return RoleConfig(role=role)
 
 
 def services_for_role(
-    services: dict, role: str | None, dhcp: bool
+    services: dict, role: str | None
 ) -> list[tuple[str, dict]]:
     """Return service entries that should be enabled on this Pi.
 
     Always services are always included. Role services match ``role``
-    (or ``dhcp == True`` for the ``dhcp-master`` role). Order preserved
-    from the manifest.
+    exactly. Order preserved from the manifest.
     """
     out: list[tuple[str, dict]] = []
     for name, entry in services.items():
@@ -91,11 +88,7 @@ def services_for_role(
             continue
         if activation != "role":
             continue
-        entry_role = entry.get("role")
-        if entry_role == "dhcp-master":
-            if dhcp:
-                out.append((name, entry))
-        elif entry_role == role:
+        if entry.get("role") == role:
             out.append((name, entry))
     return out
 

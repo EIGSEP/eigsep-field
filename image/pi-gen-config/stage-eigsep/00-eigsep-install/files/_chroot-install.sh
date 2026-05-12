@@ -72,8 +72,9 @@ fi
 ln -sf /opt/eigsep/venv/bin/eigsep-field /usr/local/bin/eigsep-field
 
 # Do not start isc-dhcp-server at image build time — only the one Pi
-# that's given `dhcp = true` in /boot/firmware/eigsep-role.conf should
-# run it.
+# with `role = backend` in /boot/firmware/eigsep-role.conf should
+# run it. eigsep-first-boot.service enables it on first boot via the
+# manifest's [services.isc_dhcp] entry.
 systemctl disable isc-dhcp-server.service || true
 
 # Mask systemd-timesyncd so it can't fight chrony for the clock. The

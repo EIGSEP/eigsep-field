@@ -31,7 +31,7 @@ def test_entry_for_role_multiple_listed() -> None:
     e = {"roles": ["panda", "backend"]}
     assert entry_for_role(e, "panda")
     assert entry_for_role(e, "backend")
-    assert not entry_for_role(e, "dhcp-master")
+    assert not entry_for_role(e, "other")
 
 
 def test_entry_for_role_unset_role_skips_role_scoped() -> None:
@@ -66,7 +66,7 @@ def test_check_firmware_skips_non_role(fake_firmware_root: Path) -> None:
             },
         }
     }
-    ok, problems = cli._check_firmware(manifest, RoleConfig("panda", False))
+    ok, problems = cli._check_firmware(manifest, RoleConfig("panda"))
     assert problems == []
     assert any("skipped" in line for line in ok)
 
@@ -83,7 +83,7 @@ def test_check_firmware_flags_missing_on_matching_role(
             },
         }
     }
-    ok, problems = cli._check_firmware(manifest, RoleConfig("backend", False))
+    ok, problems = cli._check_firmware(manifest, RoleConfig("backend"))
     assert problems  # asset doesn't exist, so it's flagged
     assert any("rfsoc_bitstream" in p for p in problems)
 
@@ -98,7 +98,7 @@ def test_check_firmware_no_roles_field_checks_all_roles(
             "global_blob": {"asset": "x.bin", "sha256": ""},
         }
     }
-    ok, problems = cli._check_firmware(manifest, RoleConfig("panda", False))
+    ok, problems = cli._check_firmware(manifest, RoleConfig("panda"))
     assert problems
     assert all("skipped" not in line for line in ok)
 
@@ -114,7 +114,7 @@ def test_check_packages_skips_non_role_hardware(monkeypatch) -> None:
             }
         },
     }
-    ok, problems = cli._check_packages(manifest, RoleConfig("panda", False))
+    ok, problems = cli._check_packages(manifest, RoleConfig("panda"))
     assert problems == []
     assert any("skipped" in line for line in ok)
 
@@ -133,5 +133,5 @@ def test_check_packages_requires_hardware_on_matching_role(
             }
         },
     }
-    ok, problems = cli._check_packages(manifest, RoleConfig("backend", False))
+    ok, problems = cli._check_packages(manifest, RoleConfig("backend"))
     assert any("casperfpga" in p for p in problems)

@@ -264,9 +264,7 @@ def _check_services(
     ok: list[str] = []
     problems: list[str] = []
     services = manifest.get("services", {})
-    expected = {
-        n for n, _ in services_for_role(services, role_cfg.role, role_cfg.dhcp)
-    }
+    expected = {n for n, _ in services_for_role(services, role_cfg.role)}
     for name, entry in services.items():
         unit = entry["unit"]
         activation = entry.get("activation")
@@ -322,8 +320,7 @@ def _cmd_doctor(_: argparse.Namespace) -> int:
     manifest = load_manifest()
     role_cfg = parse_role_file(ROLE_FILE)
     role_str = role_cfg.role or "unset"
-    dhcp_str = " +dhcp" if role_cfg.dhcp else ""
-    print(f"role: {role_str}{dhcp_str}")
+    print(f"role: {role_str}")
     if role_cfg.role is None:
         print(
             "  (no /etc/eigsep/role; role-services will be reported as "
@@ -353,10 +350,7 @@ def _cmd_services(args: argparse.Namespace) -> int:
     if args.action == "list":
         role_cfg = parse_role_file(ROLE_FILE)
         expected = {
-            n
-            for n, _ in services_for_role(
-                services, role_cfg.role, role_cfg.dhcp
-            )
+            n for n, _ in services_for_role(services, role_cfg.role)
         }
         hdr = f"{'name':<24} {'unit':<32} {'scope':<20} {'state':<20}"
         print(hdr)
@@ -475,9 +469,7 @@ def _cmd_revert(args: argparse.Namespace) -> int:
         # services this Pi's role actually runs.
         role_cfg = parse_role_file(ROLE_FILE)
         services = manifest.get("services", {})
-        for _, entry in services_for_role(
-            services, role_cfg.role, role_cfg.dhcp
-        ):
+        for _, entry in services_for_role(services, role_cfg.role):
             if entry.get("kind") == "sibling":
                 units.append(entry["unit"])
     if rc != 0:
@@ -533,35 +525,41 @@ def _write_role_file(role_cfg: RoleConfig) -> None:
     lines = []
     if role_cfg.role:
         lines.append(f"role = {role_cfg.role}")
-    lines.append(f"dhcp = {'true' if role_cfg.dhcp else 'false'}")
     ROLE_FILE.write_text("\n".join(lines) + "\n")
 
 
-DHCP_MASTER_STATIC_IP = "10.10.10.10/24"
+ROLE_STATIC_IPS = {
+    "backend": "10.10.10.10/24",
+    "panda": "10.10.10.11/24",
+}
 NM_CONNECTION_NAME = "eigsep-eth0"
 NM_CONNECTIONS_DIR = Path("/etc/NetworkManager/system-connections")
 
 
-def _apply_dhcp_master_static_ip(
+def _apply_role_static_ip(
     role_cfg: RoleConfig, nm_dir: Path = NM_CONNECTIONS_DIR
 ) -> int:
-    """Pin eth0 to 10.10.10.10/24 on the dhcp-master Pi.
+    """Pin eth0 to the role's static address.
 
-    isc-dhcp-server can't bind without a static IP on the interface
-    it serves, and the rest of the LAN expects to reach the
-    dhcp-master at 10.10.10.10. Trixie pi-gen Lite uses NetworkManager
-    (the dhcpcd binary is present but ships no systemd unit), so we
-    drop a keyfile in NM's system-connections directory and ask nmcli
-    to reload + activate it. Idempotent: re-running overwrites the
-    keyfile in place.
+    Backend gets 10.10.10.10/24 (isc-dhcp-server can't bind without a
+    static IP on the interface it serves, and the LAN expects to reach
+    the DHCP server at 10.10.10.10). Panda gets 10.10.10.11/24 so a
+    freshly-flashed panda is reachable on the bench from the operator
+    laptop without needing the backend Pi on the wire.
 
-    No-op when role_cfg.dhcp is False.
+    Trixie pi-gen Lite uses NetworkManager (the dhcpcd binary is present
+    but ships no systemd unit), so we drop a keyfile in NM's
+    system-connections directory and ask nmcli to reload + activate it.
+    Idempotent: re-running overwrites the keyfile in place.
+
+    No-op when the role has no entry in ROLE_STATIC_IPS.
     """
-    if not role_cfg.dhcp:
+    static_ip = ROLE_STATIC_IPS.get(role_cfg.role or "")
+    if static_ip is None:
         return 0
     if not nm_dir.exists():
         print(
-            f"  warn: {nm_dir} missing; cannot pin dhcp-master static IP",
+            f"  warn: {nm_dir} missing; cannot pin {role_cfg.role} static IP",
             file=sys.stderr,
         )
         return 1
@@ -580,7 +578,7 @@ def _apply_dhcp_master_static_ip(
         "\n"
         "[ipv4]\n"
         "method=manual\n"
-        f"address1={DHCP_MASTER_STATIC_IP}\n"
+        f"address1={static_ip}\n"
         "never-default=true\n"
         "\n"
         "[ipv6]\n"
@@ -599,7 +597,7 @@ def _apply_dhcp_master_static_ip(
             file=sys.stderr,
         )
         return 1
-    print(f"  dhcp-master: pinned eth0 to {DHCP_MASTER_STATIC_IP}")
+    print(f"  {role_cfg.role}: pinned eth0 to {static_ip}")
     return 0
 
 
@@ -607,13 +605,14 @@ def _apply_chrony_snippet(role_cfg: RoleConfig) -> int:
     """Symlink the role-appropriate chrony snippet and reload chrony.
 
     The snippets are staged into /etc/eigsep/chrony/ at image build
-    time. Here we pick server.conf (dhcp-master) or client.conf (rest)
-    and link it as /etc/chrony/conf.d/eigsep.conf — chrony's default
-    config already does ``confdir /etc/chrony/conf.d``, so the snippet
-    is additive.
+    time. The backend Pi gets server.conf (it's the LAN time server);
+    every other role gets client.conf. The snippet is linked at
+    /etc/chrony/conf.d/eigsep.conf — chrony's default config already
+    does ``confdir /etc/chrony/conf.d``, so the snippet is additive.
     """
     src_dir = Path("/etc/eigsep/chrony")
-    snippet = src_dir / ("server.conf" if role_cfg.dhcp else "client.conf")
+    is_server = role_cfg.role == "backend"
+    snippet = src_dir / ("server.conf" if is_server else "client.conf")
     target = Path("/etc/chrony/conf.d/eigsep.conf")
     if not snippet.exists():
         print(
@@ -655,12 +654,12 @@ def _cmd_apply_role(args: argparse.Namespace) -> int:
 
     manifest = load_manifest()
     services = manifest.get("services", {})
-    targets = services_for_role(services, role_cfg.role, role_cfg.dhcp)
+    targets = services_for_role(services, role_cfg.role)
 
     failed = 0
     # Pin the static IP before role services come up — isc-dhcp-server
     # binds to eth0 and needs the address ready first.
-    failed += _apply_dhcp_master_static_ip(role_cfg)
+    failed += _apply_role_static_ip(role_cfg)
 
     for name, entry in targets:
         if entry.get("activation") != "role":

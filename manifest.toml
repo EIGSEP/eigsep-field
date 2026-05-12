@@ -59,7 +59,7 @@ sha256  = ""
 [hardware.casperfpga]
 # SNAP board driver (CASPER collaboration). Imported by
 # eigsep-observe.service on the backend Pi to talk to the SNAP; not used
-# by panda or dhcp-master service code paths. The `roles` gate keeps
+# by panda service code paths. The `roles` gate keeps
 # `eigsep-field doctor` from flagging it missing on Pis that don't
 # import it.
 #
@@ -129,7 +129,7 @@ roles   = ["panda"]
 # not release-managed, so we pin by commit SHA. loader.py is vendored at
 # this commit into firmware/rfsoc/loader.py. The .npz lives on the
 # backend Pi at /opt/eigsep/firmware/rfsoc/ where eigsep-observe.service
-# loads it via casperfpga; panda and dhcp-master never read it.
+# loads it via casperfpga; panda never reads it.
 version = "2026-04-01"
 asset   = "eigsep_vivaldi_2026-04-01.npz"
 source  = "https://github.com/EIGSEP/eigsep_dac"
@@ -148,9 +148,9 @@ redis_server_apt = "5:8.0.2-3+deb13u1"
 # image/pi-gen-config/stage-eigsep/files/dhcp/.
 isc_dhcp_server_apt = "4.4.3-P1-8"
 # chrony disciplines time on every Pi; see [services.chrony]. The
-# dhcp-master Pi is the LAN time server (uses the operator laptop at
-# 10.10.10.2 as upstream when present); other Pis sync from the
-# dhcp-master at 10.10.10.1. Per-role chrony.conf snippet is staged to
+# backend Pi is the LAN time server (uses the operator laptop at
+# 10.10.10.17 as upstream when present); other Pis sync from the
+# backend at 10.10.10.10. Per-role chrony.conf snippet is staged to
 # /etc/eigsep/chrony/ and symlinked at first boot by _cmd_apply_role.
 chrony_apt = "4.6.1-3+deb13u1"
 # Target platform for the wheelhouse. Field deployment is 64-bit
@@ -179,7 +179,7 @@ activation = "always"
 
 [services.chrony]
 # Time sync. Every Pi runs chrony; the role-applier symlinks either
-# server.conf (dhcp-master) or client.conf (others) into
+# server.conf (backend) or client.conf (others) into
 # /etc/chrony/conf.d/eigsep.conf at first boot.
 kind       = "apt"
 unit       = "chrony.service"
@@ -189,7 +189,7 @@ activation = "always"
 kind       = "apt"
 unit       = "isc-dhcp-server.service"
 activation = "role"
-role       = "dhcp-master"
+role       = "backend"
 
 [services.picomanager]
 kind        = "sibling"
@@ -255,12 +255,6 @@ kind       = "local"
 unit       = "eigsep-backend.target"
 activation = "role"
 role       = "backend"
-
-[services.eigsep_dhcp_target]
-kind       = "local"
-unit       = "eigsep-dhcp.target"
-activation = "role"
-role       = "dhcp-master"
 
 [services.eigsep_first_boot]
 # Oneshot that runs on every boot until /boot/firmware/eigsep-role.conf
