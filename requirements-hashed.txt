@@ -64,9 +64,9 @@ cycler==0.12.1 \
     --hash=sha256:85cef7cff222d8644161529808465972e51340599459b8ac3ccbac5a854e0d30 \
     --hash=sha256:88bb128f02ba341da8ef447245a9e138fae777f6a23943da4540077d3601eb1c
     # via matplotlib
-eigsep-observing==2.0.1 \
-    --hash=sha256:21166435446aa5b4aadad99254eff41230db771565516ad7f15066b90c42c1fb \
-    --hash=sha256:6ef0b55eeeaa988792bd014c7184783622982bace4adfa8f1826e05bebac0658
+eigsep-observing==2.1.0 \
+    --hash=sha256:4b46610caec0f3c9a484d809289e77659a1b658f98d103c399312939d3a17989 \
+    --hash=sha256:b6ab5fd11e40a5dd4e3774a550e536fa31cba2e3a7fa0d0cc6e8082483917475
     # via eigsep-field
 eigsep-redis==2.1.1 \
     --hash=sha256:3c78d63264a2dfce913706c0de977cf63e55a9e9a4aa8ec32eda3d9823ca6f78 \
