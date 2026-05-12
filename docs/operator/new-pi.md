@@ -61,15 +61,17 @@ time discipline.
 
 ## 3. Set the role on first boot
 
-Create `/boot/firmware/eigsep-role.conf` on the Pi's boot partition
-before first power-on. (Trixie's pi-gen mounts the FAT boot partition
-at `/boot/firmware`; that's where it lands when the SD card is
-inspected from a desktop. Older `/boot/eigsep-role.conf` is also still
-honored for backward compatibility.) Contents:
+After running `dd`, leave the SD card in the reader — Linux auto-mounts
+the FAT boot partition (label `bootfs`) at `/media/$USER/bootfs/`.
+Create `eigsep-role.conf` there before first power-on:
 
 ```
-role = panda          # or "backend"
+echo "role = panda" > /media/$USER/bootfs/eigsep-role.conf   # or "backend"
 ```
+
+On the Pi this same partition is mounted at `/boot/firmware/`, so the
+file ends up at `/boot/firmware/eigsep-role.conf` once the SD card is
+in the Pi — but the operator never touches that path directly.
 
 `eigsep-first-boot.service` reads it on first boot, enables the
 matching services, pins eth0 to the role's static IP, and

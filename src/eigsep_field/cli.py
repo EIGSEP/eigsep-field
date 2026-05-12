@@ -35,13 +35,13 @@ from eigsep_field._patch import (
 from eigsep_field._services import (
     KNOWN_ROLES,
     ROLE_FILE,
+    BOOT_ROLE_CONF,
     RoleConfig,
     entry_for_role,
     is_active,
     is_enabled,
     nmcli,
     parse_role_file,
-    resolve_boot_role_conf,
     services_for_role,
     services_importing_package,
     systemctl,
@@ -631,13 +631,8 @@ def _apply_chrony_snippet(role_cfg: RoleConfig) -> int:
 
 
 def _cmd_apply_role(args: argparse.Namespace) -> int:
-    """First-boot hook: apply the operator's role conf and self-disable.
-
-    With no path argument, scans the candidates documented in
-    ``_services.resolve_boot_role_conf`` (Trixie ``/boot/firmware`` first,
-    legacy ``/boot`` fallback) and uses the first existing file.
-    """
-    path = Path(args.role_conf) if args.role_conf else resolve_boot_role_conf()
+    """First-boot hook: apply the operator's role conf and self-disable."""
+    path = Path(args.role_conf) if args.role_conf else BOOT_ROLE_CONF
     role_cfg = parse_role_file(path)
     if role_cfg.role is None:
         print(f"{path}: no role= line found", file=sys.stderr)
@@ -778,16 +773,13 @@ def main(argv: list[str] | None = None) -> int:
     src.set_defaults(func=_cmd_src)
     src.add_argument("name", help="sibling TOML key (e.g. eigsep_observing)")
 
-    # Hidden: invoked only by eigsep-first-boot.service. Path is optional;
-    # when absent, the CLI resolves the boot-mount candidates itself so the
-    # systemd unit doesn't need to know which Pi-gen series the SD was
-    # written for.
+    # Hidden: invoked only by eigsep-first-boot.service.
     ar = sub.add_parser("_apply-role", help=argparse.SUPPRESS)
     ar.add_argument(
         "role_conf",
         nargs="?",
         default=None,
-        help="path to eigsep-role.conf (default: resolve from boot mount)",
+        help=f"path to eigsep-role.conf (default: {BOOT_ROLE_CONF})",
     )
     ar.set_defaults(func=_cmd_apply_role)
 
