@@ -474,15 +474,46 @@ def _cmd_services(args: argparse.Namespace) -> int:
     raise AssertionError(f"unhandled services action: {args.action}")
 
 
-def _unknown_target(manifest: dict, name: str) -> int:
-    names = sorted(
-        list_sibling_names(manifest) + list_firmware_target_names(manifest)
-    )
+def _unknown_target(
+    manifest: dict, name: str, *, include_firmware: bool
+) -> int:
+    names = list_sibling_names(manifest)
+    if include_firmware:
+        names = names + list_firmware_target_names(manifest)
     print(
-        f"unknown target {name!r}; known: {', '.join(names)}",
+        f"unknown target {name!r}; known: {', '.join(sorted(names))}",
         file=sys.stderr,
     )
     return 2
+
+
+def _hint_firmware_target(manifest: dict, name: str, cmd: str) -> bool:
+    """Print a redirect hint if ``name`` is a firmware target.
+
+    ``src``/``capture`` only accept siblings, but ``pico-firmware`` is
+    operator muscle memory and shares its clone tree with the
+    ``picohost`` sibling. Catch the mistype before the generic "unknown
+    target" error and point at the sibling that backs the same path.
+    Returns True iff a hint was printed.
+    """
+    fw = resolve_firmware_target(manifest, name)
+    if fw is None:
+        return False
+    for s in all_siblings(manifest):
+        if s.src_path == fw.src_path:
+            print(
+                f"{name!r} is a firmware target; its source tree is "
+                f"shared with sibling {s.name!r} — try "
+                f"`eigsep-field {cmd} {s.name}`",
+                file=sys.stderr,
+            )
+            return True
+    print(
+        f"{name!r} is a firmware target; `eigsep-field {cmd}` only "
+        f"accepts siblings",
+        file=sys.stderr,
+    )
+    return True
 
 
 def _cmd_patch(args: argparse.Namespace) -> int:
@@ -504,7 +535,7 @@ def _cmd_patch(args: argparse.Namespace) -> int:
 
     sibling = resolve_sibling(manifest, args.name)
     if sibling is None:
-        return _unknown_target(manifest, args.name)
+        return _unknown_target(manifest, args.name, include_firmware=True)
     if not (sibling.src_path / ".git").exists():
         print(
             f"no source tree at {sibling.src_path} (or no .git/)",
@@ -554,7 +585,7 @@ def _cmd_revert(args: argparse.Namespace) -> int:
     if args.name:
         sibling = resolve_sibling(manifest, args.name)
         if sibling is None:
-            return _unknown_target(manifest, args.name)
+            return _unknown_target(manifest, args.name, include_firmware=True)
         rc = revert_package(sibling)
         units = services_importing_package(manifest, sibling.pypi_name)
     else:
@@ -580,7 +611,9 @@ def _cmd_capture(args: argparse.Namespace) -> int:
     manifest = load_manifest()
     sibling = resolve_sibling(manifest, args.name)
     if sibling is None:
-        return _unknown_target(manifest, args.name)
+        if _hint_firmware_target(manifest, args.name, "capture"):
+            return 2
+        return _unknown_target(manifest, args.name, include_firmware=False)
     text = build_capture(sibling, manifest)
     if text is None:
         print(f"no changes to capture for {sibling.name}")
@@ -601,9 +634,19 @@ def _cmd_capture(args: argparse.Namespace) -> int:
 
 def _cmd_src(args: argparse.Namespace) -> int:
     manifest = load_manifest()
+    # Firmware targets resolve first so `eigsep-field src pico-firmware`
+    # lands on the shared clone tree even though pico-firmware isn't a
+    # Python sibling.
+    fw = resolve_firmware_target(manifest, args.name)
+    if fw is not None:
+        if not fw.src_path.exists():
+            print(f"no source tree at {fw.src_path}", file=sys.stderr)
+            return 2
+        print(fw.src_path)
+        return 0
     sibling = resolve_sibling(manifest, args.name)
     if sibling is None:
-        return _unknown_target(manifest, args.name)
+        return _unknown_target(manifest, args.name, include_firmware=True)
     if not sibling.src_path.exists():
         print(
             f"no source tree at {sibling.src_path}",
@@ -870,10 +913,14 @@ def main(argv: list[str] | None = None) -> int:
 
     src = sub.add_parser(
         "src",
-        help="print the path to a sibling's source tree",
+        help="print the path to a sibling or firmware target's source tree",
     )
     src.set_defaults(func=_cmd_src)
-    src.add_argument("name", help="sibling TOML key (e.g. eigsep_observing)")
+    src.add_argument(
+        "name",
+        help="sibling TOML key (e.g. eigsep_observing) or firmware "
+        "target (e.g. pico-firmware)",
+    )
 
     # Hidden: invoked only by eigsep-first-boot.service.
     ar = sub.add_parser("_apply-role", help=argparse.SUPPRESS)
