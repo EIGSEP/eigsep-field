@@ -105,6 +105,16 @@ fi
 # doesn't need sudo.
 install -d -m 0755 -o eigsep -g eigsep /opt/eigsep/captures
 
+# Pre-create the [external.cmtvna] install path with operator ownership.
+# The proprietary cmtvna binary cannot be redistributed under our MIT
+# license, so the operator stages it once after first boot via
+# `sudo install-cmtvna.sh`. We just guarantee the target dir exists
+# with the right owner so the service unit's WorkingDirectory resolves
+# even before the binary lands. Doctor flags the missing binary on
+# panda role until the operator runs the install step.
+install -d -m 0755 -o eigsep -g eigsep /opt/eigsep/cmt-vna
+install -d -m 0755 -o eigsep -g eigsep /opt/eigsep/cmt-vna/bin
+
 # Operator navigation aids in /home/eigsep. Canonical paths stay under
 # /opt/eigsep (FHS, user-account-agnostic for systemd units, stable for
 # `eigsep-field patch`); the homedir gets symlinks so `ls ~`, `cd ~/src`,

@@ -137,6 +137,31 @@ commit  = ""
 sha256  = ""
 roles   = ["backend"]
 
+# ---- External binaries (proprietary, operator-installed) ----
+#
+# [external.*] entries describe userspace binaries we cannot redistribute
+# (proprietary vendor licenses) and that an operator installs once per Pi
+# from the vendor's CDN. The image build pre-creates `install_path` with
+# eigsep:eigsep ownership; the operator runs scripts/install-cmtvna.sh
+# (or the per-binary helper) to stage the unpacked tree. doctor checks
+# presence on the listed roles and tells the operator how to install.
+# Distinct from [firmware.*], which is for blobs we *do* redistribute.
+
+[external.cmtvna]
+# CMT R60 VNA driver — proprietary, ships out-of-band from CMT (we cannot
+# mirror it under an MIT-licensed public repo). The panda Pi's
+# cmtvna.service ExecStarts /opt/eigsep/cmt-vna/bin/cmtvna in
+# socket-server mode; without it the service crash-loops. The python
+# wrapper `eigsep-vna` ([packages.eigsep-vna]) is independent — these
+# two versions track separately. sha256 stays empty until first
+# hand-validation pins it; CMT may rev the URL silently.
+version      = "1.7.1"
+url          = "https://coppermountaintech.com/wp-content/uploads/2026/05/cmtvna-1.7.1-linux-aarch64.tar.gz.zip"
+sha256       = ""
+install_path = "/opt/eigsep/cmt-vna"
+binary       = "bin/cmtvna"
+roles        = ["panda"]
+
 # ---- Out-of-band pins (system packages baked into the image) ----
 
 [system]

@@ -115,6 +115,20 @@ def _cmd_info(_: argparse.Namespace) -> int:
             if status == "DRIFT":
                 any_drift = True
         print(f"{pypi_name:<24} {blessed:<12} {installed:<12} {status}")
+
+    # External binaries (e.g. cmtvna). Proprietary, operator-installed
+    # via scripts/install-cmtvna.sh. Reported on every Pi (doctor's
+    # role-aware check is where missing-on-applicable-role becomes a FAIL).
+    for name, entry in manifest.get("external", {}).items():
+        blessed = entry["version"]
+        binary = Path(entry["install_path"]) / entry["binary"]
+        if binary.is_file() and os.access(binary, os.X_OK):
+            installed = "present"
+            status = "ok"
+        else:
+            installed = "(not installed)"
+            status = "external"
+        print(f"{name:<24} {blessed:<12} {installed:<12} {status}")
     return 1 if any_drift else 0
 
 
@@ -187,6 +201,39 @@ def _check_firmware(
             )
         else:
             ok.append(f"{kind}: {asset.name} sha256 matches")
+    return ok, problems
+
+
+def _check_external(
+    manifest: dict, role_cfg: RoleConfig
+) -> tuple[list[str], list[str]]:
+    """Return (ok, problems) for [external.*] binaries.
+
+    Role-aware via ``roles = [...]`` — proprietary binaries are tied to
+    the Pi roles that import them. Missing on a non-matching role is
+    "skipped"; missing on a matching role is a FAIL with a hint at the
+    operator install command.
+    """
+    ok: list[str] = []
+    problems: list[str] = []
+    for name, entry in manifest.get("external", {}).items():
+        if not entry_for_role(entry, role_cfg.role):
+            ok.append(
+                f"{name}: skipped (not this role — roles={entry['roles']})"
+            )
+            continue
+        binary = Path(entry["install_path"]) / entry["binary"]
+        if not binary.is_file():
+            problems.append(
+                f"{name}: missing {binary} "
+                f"(operator install: "
+                f"sudo /opt/eigsep/src/eigsep-field/scripts/install-{name}.sh)"
+            )
+            continue
+        if not os.access(binary, os.X_OK):
+            problems.append(f"{name}: {binary} present but not executable")
+            continue
+        ok.append(f"{name}: {binary} present (manifest v{entry['version']})")
     return ok, problems
 
 
@@ -331,16 +378,17 @@ def _cmd_doctor(_: argparse.Namespace) -> int:
     fw_ok, fw_prob = _check_firmware(manifest, role_cfg)
     pkg_ok, pkg_prob = _check_packages(manifest, role_cfg)
     svc_ok, svc_prob = _check_services(manifest, role_cfg)
+    ext_ok, ext_prob = _check_external(manifest, role_cfg)
     notes = _check_editable_drift(manifest)
 
-    for line in fw_ok + pkg_ok + svc_ok:
+    for line in fw_ok + pkg_ok + svc_ok + ext_ok:
         print(f"  ok   {line}")
     for line in notes:
         print(f"  note {line}")
-    for line in fw_prob + pkg_prob + svc_prob:
+    for line in fw_prob + pkg_prob + svc_prob + ext_prob:
         print(f"  FAIL {line}", file=sys.stderr)
 
-    return 1 if (fw_prob or pkg_prob or svc_prob) else 0
+    return 1 if (fw_prob or pkg_prob or svc_prob or ext_prob) else 0
 
 
 def _cmd_services(args: argparse.Namespace) -> int:
