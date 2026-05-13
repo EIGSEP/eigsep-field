@@ -18,18 +18,24 @@ from pathlib import Path
 from eigsep_field import load_manifest
 from eigsep_field._patch import (
     CAPTURES_DIR,
+    all_firmware_targets,
     all_siblings,
     blessed_commit,
     build_capture,
     dirty_count,
     editable_source,
     git_head,
+    has_active_firmware_patch,
     install_editable,
+    list_firmware_target_names,
     list_sibling_names,
+    patch_firmware,
     require_root,
+    resolve_firmware_target,
     resolve_sibling,
     restart_units,
     revert_all,
+    revert_firmware,
     revert_package,
 )
 from eigsep_field._services import (
@@ -363,6 +369,26 @@ def _check_editable_drift(manifest: dict) -> list[str]:
     return notes
 
 
+def _check_firmware_patches(manifest: dict) -> list[str]:
+    """Surface active firmware drop-in overrides as advisory notes.
+
+    When the operator has run ``eigsep-field patch pico-firmware``, a
+    drop-in retargets the unit's --uf2 flag at the field-built UF2.
+    This must be operator-visible from a cold ssh so a stale hotfix
+    doesn't haunt the next campaign.
+    """
+    notes: list[str] = []
+    for t in all_firmware_targets(manifest):
+        if not has_active_firmware_patch(t):
+            continue
+        notes.append(
+            f"{t.name}: field-patched UF2 active -> {t.field_uf2}  "
+            f"[service: {t.service_unit}; revert: "
+            f"`sudo eigsep-field revert {t.name}`]"
+        )
+    return notes
+
+
 def _cmd_doctor(_: argparse.Namespace) -> int:
     manifest = load_manifest()
     role_cfg = parse_role_file(ROLE_FILE)
@@ -379,7 +405,7 @@ def _cmd_doctor(_: argparse.Namespace) -> int:
     pkg_ok, pkg_prob = _check_packages(manifest, role_cfg)
     svc_ok, svc_prob = _check_services(manifest, role_cfg)
     ext_ok, ext_prob = _check_external(manifest, role_cfg)
-    notes = _check_editable_drift(manifest)
+    notes = _check_editable_drift(manifest) + _check_firmware_patches(manifest)
 
     for line in fw_ok + pkg_ok + svc_ok + ext_ok:
         print(f"  ok   {line}")
@@ -448,10 +474,12 @@ def _cmd_services(args: argparse.Namespace) -> int:
     raise AssertionError(f"unhandled services action: {args.action}")
 
 
-def _unknown_sibling(manifest: dict, name: str) -> int:
-    names = sorted(list_sibling_names(manifest))
+def _unknown_target(manifest: dict, name: str) -> int:
+    names = sorted(
+        list_sibling_names(manifest) + list_firmware_target_names(manifest)
+    )
     print(
-        f"unknown sibling {name!r}; known: {', '.join(names)}",
+        f"unknown target {name!r}; known: {', '.join(names)}",
         file=sys.stderr,
     )
     return 2
@@ -459,9 +487,24 @@ def _unknown_sibling(manifest: dict, name: str) -> int:
 
 def _cmd_patch(args: argparse.Namespace) -> int:
     manifest = load_manifest()
+    # Firmware targets are resolved first so an operator typing
+    # `pico-firmware` always lands in the build+flash flow, never in a
+    # surprise Python-editable install of a same-named sibling.
+    fw = resolve_firmware_target(manifest, args.name)
+    if fw is not None:
+        print(f"firmware target: {fw.name} -> {fw.src_path}")
+        print(f"build:           {fw.src_path / fw.script}")
+        print(f"will reflash:    {fw.service_unit}")
+        if args.dry_run:
+            return 0
+        rc = require_root("patch")
+        if rc is not None:
+            return rc
+        return patch_firmware(fw)
+
     sibling = resolve_sibling(manifest, args.name)
     if sibling is None:
-        return _unknown_sibling(manifest, args.name)
+        return _unknown_target(manifest, args.name)
     if not (sibling.src_path / ".git").exists():
         print(
             f"no source tree at {sibling.src_path} (or no .git/)",
@@ -502,11 +545,16 @@ def _cmd_revert(args: argparse.Namespace) -> int:
     if rc is not None:
         return rc
 
+    if args.name:
+        fw = resolve_firmware_target(manifest, args.name)
+        if fw is not None:
+            return revert_firmware(fw)
+
     units: list[str] = []
     if args.name:
         sibling = resolve_sibling(manifest, args.name)
         if sibling is None:
-            return _unknown_sibling(manifest, args.name)
+            return _unknown_target(manifest, args.name)
         rc = revert_package(sibling)
         units = services_importing_package(manifest, sibling.pypi_name)
     else:
@@ -532,7 +580,7 @@ def _cmd_capture(args: argparse.Namespace) -> int:
     manifest = load_manifest()
     sibling = resolve_sibling(manifest, args.name)
     if sibling is None:
-        return _unknown_sibling(manifest, args.name)
+        return _unknown_target(manifest, args.name)
     text = build_capture(sibling, manifest)
     if text is None:
         print(f"no changes to capture for {sibling.name}")
@@ -555,7 +603,7 @@ def _cmd_src(args: argparse.Namespace) -> int:
     manifest = load_manifest()
     sibling = resolve_sibling(manifest, args.name)
     if sibling is None:
-        return _unknown_sibling(manifest, args.name)
+        return _unknown_target(manifest, args.name)
     if not sibling.src_path.exists():
         print(
             f"no source tree at {sibling.src_path}",
@@ -763,10 +811,15 @@ def main(argv: list[str] | None = None) -> int:
 
     patch = sub.add_parser(
         "patch",
-        help="install a sibling editable from /opt/eigsep/src (needs sudo)",
+        help="install a sibling editable, or rebuild+reflash a firmware "
+        "target, from /opt/eigsep/src (needs sudo)",
     )
     patch.set_defaults(func=_cmd_patch)
-    patch.add_argument("name", help="sibling TOML key (e.g. eigsep_observing)")
+    patch.add_argument(
+        "name",
+        help="sibling TOML key (e.g. eigsep_observing) or firmware "
+        "target (e.g. pico-firmware)",
+    )
     patch.add_argument(
         "--no-restart",
         action="store_true",
@@ -780,14 +833,15 @@ def main(argv: list[str] | None = None) -> int:
 
     revert = sub.add_parser(
         "revert",
-        help="restore a sibling (or all) to the blessed wheelhouse "
-        "(needs sudo)",
+        help="restore a sibling, firmware target, or everything to the "
+        "blessed wheelhouse (needs sudo)",
     )
     revert.set_defaults(func=_cmd_revert)
     revert.add_argument(
         "name",
         nargs="?",
-        help="sibling TOML key; omit (or pass --all) for full uv sync",
+        help="sibling TOML key or firmware target (e.g. pico-firmware); "
+        "omit (or pass --all) for full uv sync",
     )
     revert.add_argument(
         "--all",

@@ -54,7 +54,10 @@ def all_siblings(manifest: dict) -> list[Sibling]:
     """Every ``[packages.*]`` and ``[hardware.*]`` entry as a Sibling.
 
     eigsep-field itself is not returned: it's cloned for its lockfile
-    but operators don't patch/revert it as a sibling.
+    but operators don't patch/revert it as a sibling. ``clone_path`` on
+    the manifest entry overrides the on-disk directory name — see the
+    picohost entry which lives under ``pico-firmware/`` because that's
+    the repo it shares with the C firmware source.
     """
     out: list[Sibling] = []
     for name, entry in manifest.get("packages", {}).items():
@@ -64,7 +67,7 @@ def all_siblings(manifest: dict) -> list[Sibling]:
                 pypi_name=entry.get("pypi", name),
                 version=entry["version"],
                 tag=entry["tag"],
-                src_path=SRC_ROOT / name,
+                src_path=SRC_ROOT / entry.get("clone_path", name),
             )
         )
     for name, entry in manifest.get("hardware", {}).items():
@@ -74,7 +77,7 @@ def all_siblings(manifest: dict) -> list[Sibling]:
                 pypi_name=name,
                 version=entry["version"],
                 tag=entry["tag"],
-                src_path=SRC_ROOT / name,
+                src_path=SRC_ROOT / entry.get("clone_path", name),
             )
         )
     return out
@@ -94,6 +97,286 @@ def resolve_sibling(manifest: dict, name: str) -> Sibling | None:
 
 def list_sibling_names(manifest: dict) -> list[str]:
     return [s.name for s in all_siblings(manifest)]
+
+
+# ---------------------------------------------------------------------------
+# Firmware build targets — for [firmware.<kind>.build] entries that declare
+# an on-image rebuild flow (currently just pico-firmware). Resolved by
+# ``src_path`` (which equals the clone directory under SRC_ROOT and is what
+# the operator types: ``eigsep-field patch pico-firmware``).
+# ---------------------------------------------------------------------------
+
+
+FIRMWARE_ROOT = Path(os.environ.get("EIGSEP_FIRMWARE", "/opt/eigsep/firmware"))
+SYSTEMD_ETC_ROOT = Path(
+    os.environ.get("EIGSEP_SYSTEMD_ETC", "/etc/systemd/system")
+)
+DROP_IN_FILENAME = "eigsep-patch.conf"
+
+
+@dataclass(frozen=True)
+class FirmwareTarget:
+    """A firmware kind whose UF2 can be rebuilt + reflashed in the field.
+
+    Carries everything the patch/revert flow needs without re-reading the
+    manifest: the on-disk source path, the build script + artifact, the
+    systemd unit whose ``--uf2`` flag gets retargeted, and the blessed
+    UF2 path used as the revert target.
+    """
+
+    kind: str
+    name: str
+    src_path: Path
+    script: str
+    artifact_relpath: str
+    service_unit: str
+    blessed_uf2: Path
+
+    @property
+    def field_uf2(self) -> Path:
+        return self.src_path / self.artifact_relpath
+
+    @property
+    def drop_in_path(self) -> Path:
+        return SYSTEMD_ETC_ROOT / f"{self.service_unit}.d" / DROP_IN_FILENAME
+
+
+def all_firmware_targets(manifest: dict) -> list[FirmwareTarget]:
+    """Return one FirmwareTarget per [firmware.*] entry with a ``build`` block."""
+    out: list[FirmwareTarget] = []
+    for kind, entry in manifest.get("firmware", {}).items():
+        build = entry.get("build")
+        if not build:
+            continue
+        src_path = SRC_ROOT / build["src_path"]
+        out.append(
+            FirmwareTarget(
+                kind=kind,
+                name=build["src_path"],
+                src_path=src_path,
+                script=build["script"],
+                artifact_relpath=build["artifact"],
+                service_unit=build["service"],
+                blessed_uf2=FIRMWARE_ROOT / kind / entry["asset"],
+            )
+        )
+    return out
+
+
+def resolve_firmware_target(
+    manifest: dict, name: str
+) -> FirmwareTarget | None:
+    for t in all_firmware_targets(manifest):
+        if t.name == name:
+            return t
+    return None
+
+
+def list_firmware_target_names(manifest: dict) -> list[str]:
+    return [t.name for t in all_firmware_targets(manifest)]
+
+
+def _run(cmd: list[str], **kw) -> int:
+    """Wrapper around subprocess.run that streams stdout/stderr."""
+    return subprocess.run(cmd, **kw).returncode
+
+
+def patch_firmware(target: FirmwareTarget) -> int:
+    """Build + reflash + drop-in retarget — the field hotfix flow.
+
+    Order matters: build first (fails noisily before touching the
+    running service), then stop, flash, drop-in, start. A build failure
+    leaves picomanager untouched. A flash failure restarts the service
+    on its blessed config without writing the drop-in.
+    """
+    if not (target.src_path / ".git").exists():
+        print(
+            f"no source tree at {target.src_path} (or no .git/)",
+            file=sys.stderr,
+        )
+        return 2
+    script = target.src_path / target.script
+    if not script.exists():
+        print(f"build script {script} not found", file=sys.stderr)
+        return 2
+
+    print(f"building {target.name}: {script}")
+    rc = _run(["bash", str(script)], cwd=str(target.src_path))
+    if rc != 0:
+        print(
+            f"build failed (rc={rc}); picomanager left untouched",
+            file=sys.stderr,
+        )
+        return rc
+    if not target.field_uf2.exists():
+        print(
+            f"build succeeded but {target.field_uf2} not produced",
+            file=sys.stderr,
+        )
+        return 1
+
+    print(f"stopping {target.service_unit}")
+    rc, msg = systemctl("stop", target.service_unit)
+    if rc != 0:
+        print(f"  FAIL stop: {msg}", file=sys.stderr)
+        return rc
+
+    print(f"flashing pico(s) with {target.field_uf2}")
+    rc = _run(["flash-picos", "--uf2", str(target.field_uf2)])
+    if rc != 0:
+        print(
+            "flash failed; restarting service on blessed config",
+            file=sys.stderr,
+        )
+        # Best-effort: restart service so the panda comes back. Drop-in
+        # was never written, so this picks up the blessed --uf2.
+        systemctl("start", target.service_unit)
+        return rc
+
+    drop_in = target.drop_in_path
+    drop_in.parent.mkdir(parents=True, exist_ok=True)
+    drop_in.write_text(_render_drop_in(target))
+    print(f"wrote drop-in {drop_in}")
+
+    rc, msg = systemctl("daemon-reload")
+    if rc != 0:
+        print(f"  FAIL daemon-reload: {msg}", file=sys.stderr)
+        return rc
+    rc, msg = systemctl("start", target.service_unit)
+    if rc != 0:
+        print(f"  FAIL start: {msg}", file=sys.stderr)
+        return rc
+    print(f"  started {target.service_unit} (running field UF2)")
+    print()
+    print(
+        "  WARNING: field UF2 must keep picotool's USB stdio config "
+        "enabled,\n"
+        "  otherwise the next `flash-picos` cannot trigger BOOTSEL and "
+        "the\n"
+        "  device becomes unrecoverable without physical SD/button "
+        "access."
+    )
+    return 0
+
+
+def revert_firmware(target: FirmwareTarget) -> int:
+    """Drop the override and reflash the blessed UF2 onto the pico(s).
+
+    Explicit reflash (rather than relying on picomanager's empty-Redis
+    auto-flash branch) — picomanager skips the flash branch when Redis
+    already has the picos, which is the common case post-patch.
+    """
+    drop_in = target.drop_in_path
+    if drop_in.exists():
+        drop_in.unlink()
+        print(f"removed drop-in {drop_in}")
+        # Best-effort: also remove the .d dir if now empty so /etc stays
+        # tidy. systemd doesn't care either way.
+        try:
+            drop_in.parent.rmdir()
+        except OSError:
+            pass
+    else:
+        print(f"no drop-in at {drop_in} (already reverted?)")
+
+    rc, msg = systemctl("daemon-reload")
+    if rc != 0:
+        print(f"  warn: daemon-reload failed: {msg}", file=sys.stderr)
+    rc, msg = systemctl("stop", target.service_unit)
+    if rc != 0:
+        print(f"  FAIL stop: {msg}", file=sys.stderr)
+        return rc
+
+    if not target.blessed_uf2.exists():
+        print(
+            f"blessed UF2 {target.blessed_uf2} missing — cannot reflash",
+            file=sys.stderr,
+        )
+        systemctl("start", target.service_unit)
+        return 1
+    print(f"flashing pico(s) with blessed {target.blessed_uf2}")
+    rc = _run(["flash-picos", "--uf2", str(target.blessed_uf2)])
+    if rc != 0:
+        print(
+            f"flash failed (rc={rc}); starting service anyway",
+            file=sys.stderr,
+        )
+        systemctl("start", target.service_unit)
+        return rc
+    rc, msg = systemctl("start", target.service_unit)
+    if rc != 0:
+        print(f"  FAIL start: {msg}", file=sys.stderr)
+        return rc
+    print(f"  started {target.service_unit} (running blessed UF2)")
+    return 0
+
+
+def _render_drop_in(target: FirmwareTarget) -> str:
+    """ExecStart override pointing the service at the field-built UF2.
+
+    Constructed by stripping the blessed UF2 path from the unit's
+    ExecStart and substituting the field path. We read the actual
+    ExecStart so we don't drift if upstream picohost grows new flags.
+    """
+    fragment = _read_unit_execstart(target.service_unit)
+    new = _swap_uf2_path(fragment, target.field_uf2)
+    return (
+        "# Written by `eigsep-field patch " + target.name + "`.\n"
+        "# Remove with `eigsep-field revert " + target.name + "`.\n"
+        "[Service]\n"
+        "ExecStart=\n"
+        f"ExecStart={new}\n"
+    )
+
+
+def _read_unit_execstart(unit: str) -> str:
+    """Return the ExecStart= argv from the blessed unit file.
+
+    Reads /etc/systemd/system/<unit> directly so the override is
+    rebuilt against the *blessed* command line, not any existing
+    drop-in. Returns "" on a missing/unreadable unit, in which case
+    callers fall back to a hardcoded picomanager ExecStart.
+    """
+    path = SYSTEMD_ETC_ROOT / unit
+    if not path.exists():
+        return ""
+    for raw in path.read_text().splitlines():
+        line = raw.strip()
+        if line.startswith("ExecStart="):
+            return line.split("=", 1)[1].strip()
+    return ""
+
+
+def _swap_uf2_path(execstart: str, new_uf2: Path) -> str:
+    """Return ``execstart`` with the ``--uf2 <path>`` argument retargeted.
+
+    Conservative tokenizer: splits on whitespace, finds ``--uf2`` and
+    replaces the next token. If ``--uf2`` isn't present or
+    ``execstart`` is empty, returns a minimal fallback ExecStart that
+    invokes pico-manager with just the new UF2 — works on a stock
+    picomanager.service, fails loudly if upstream drifts.
+    """
+    tokens = execstart.split()
+    if not tokens or "--uf2" not in tokens:
+        # Fallback: assume the blessed argv layout. Picomanager's unit
+        # file is the upstream-aligned ExecStart=/opt/eigsep/venv/bin/
+        # pico-manager --config /etc/eigsep/pico_config.json --uf2 ...
+        return (
+            "/opt/eigsep/venv/bin/pico-manager "
+            "--config /etc/eigsep/pico_config.json "
+            f"--uf2 {new_uf2}"
+        )
+    i = tokens.index("--uf2")
+    if i + 1 >= len(tokens):
+        tokens.append(str(new_uf2))
+    else:
+        tokens[i + 1] = str(new_uf2)
+    return " ".join(tokens)
+
+
+def has_active_firmware_patch(target: FirmwareTarget) -> bool:
+    """True if a drop-in exists for this target's service."""
+    return target.drop_in_path.exists()
 
 
 def editable_source(pypi_name: str) -> Path | None:

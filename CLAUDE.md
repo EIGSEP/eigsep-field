@@ -148,6 +148,46 @@ To add one:
 same semantics — the doctor's firmware blob check is gated identically
 (e.g. the rfsoc bitstream is only required on backend).
 
+Two optional fields on a `[packages.*]` or `[hardware.*]` entry change
+how `clone-sources` lays the tree out on the image:
+
+- `clone_path = "<dir>"` — git-clones under
+  `/opt/eigsep/src/<dir>/` instead of the default
+  `/opt/eigsep/src/<tomlkey>/`. Use this when the upstream repo's name
+  differs from the Python package's name (e.g. `picohost` lives in
+  the `pico-firmware` repo and the operator wants the on-disk path to
+  match the repo).
+- `recursive_submodules = true` — runs `git submodule update --init
+  --recursive` after the clone so submodule trees (e.g. pico-sdk +
+  lib/cJSON for pico-firmware) are present on the offline image.
+
+## When firmware can be rebuilt on the image
+
+A `[firmware.<kind>]` entry can carry a `[firmware.<kind>.build]`
+sub-table that turns `eigsep-field patch <name>` into a build-and-flash
+flow. Currently used by `[firmware.pico.build]` only.
+
+Required keys:
+
+- `src_path` — clone directory under `/opt/eigsep/src/`. The operator
+  types this name (`eigsep-field patch pico-firmware`).
+- `script` — build script relative to `src_path`. Run from there.
+- `artifact` — UF2 path relative to `src_path` (e.g.
+  `build/pico_multi.uf2`).
+- `service` — systemd unit whose `--uf2` flag is retargeted via a
+  drop-in at `/etc/systemd/system/<unit>.d/eigsep-patch.conf`.
+
+The blessed UF2 at `/opt/eigsep/firmware/<kind>/<asset>` is **never**
+overwritten — the field UF2 is identified by path, and `revert` deletes
+the drop-in and reflashes blessed.
+
+To add a new on-image-buildable firmware target: add `[firmware.<kind>.build]`,
+clone the source repo via a `[packages.*]` or `[hardware.*]` entry
+with matching `clone_path` (so the same tree backs both the Python and
+firmware sides if applicable), and add the required cross-compile
+toolchain to `_chroot-install.sh`'s apt list. `picotool` is already in
+the list for pico.
+
 ## When adding a systemd service to the image
 
 Services are declared in `manifest.toml` `[services.*]` and driven from

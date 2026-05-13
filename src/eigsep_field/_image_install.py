@@ -28,6 +28,7 @@ from __future__ import annotations
 import argparse
 import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 from eigsep_field import load_manifest
@@ -53,18 +54,46 @@ def _cmd_enable_always(_: argparse.Namespace) -> int:
     return 1 if failed else 0
 
 
-def _clone_targets(manifest: dict) -> list[tuple[str, str, str]]:
-    """Return (name, source, tag) for every tree to clone into /opt/eigsep/src.
+@dataclass(frozen=True)
+class CloneTarget:
+    """A sibling tree to git-clone into /opt/eigsep/src/.
+
+    ``clone_path`` defaults to ``name`` but lets a manifest entry land
+    under a different directory than its TOML key — the picohost
+    package, for example, lives in the pico-firmware repo and is
+    cloned to /opt/eigsep/src/pico-firmware/ so the operator's path
+    matches the repo name they think in.
+    """
+
+    name: str
+    source: str
+    tag: str
+    clone_path: str
+    recursive_submodules: bool
+
+    @classmethod
+    def from_entry(cls, name: str, entry: dict) -> "CloneTarget":
+        return cls(
+            name=name,
+            source=entry["source"],
+            tag=entry["tag"],
+            clone_path=entry.get("clone_path", name),
+            recursive_submodules=bool(entry.get("recursive_submodules")),
+        )
+
+
+def _clone_targets(manifest: dict) -> list[CloneTarget]:
+    """Return one CloneTarget per tree to clone into /opt/eigsep/src.
 
     eigsep-field itself is not in this list — image.yml stages the
     runner's checkout into the rootfs before this runs, so the on-image
     eigsep-field tree is the SHA that triggered the build.
     """
-    targets: list[tuple[str, str, str]] = []
+    targets: list[CloneTarget] = []
     for name, entry in manifest.get("packages", {}).items():
-        targets.append((name, entry["source"], entry["tag"]))
+        targets.append(CloneTarget.from_entry(name, entry))
     for name, entry in manifest.get("hardware", {}).items():
-        targets.append((name, entry["source"], entry["tag"]))
+        targets.append(CloneTarget.from_entry(name, entry))
     return targets
 
 
@@ -75,19 +104,36 @@ def _cmd_clone_sources(args: argparse.Namespace) -> int:
 
     targets = _clone_targets(manifest)
     failed = 0
-    for name, source, tag in targets:
-        dest = src_root / name
+    for t in targets:
+        dest = src_root / t.clone_path
         if dest.exists():
-            print(f"  skip {name}: {dest} already present")
+            print(f"  skip {t.name}: {dest} already present")
             continue
-        print(f"  cloning {name} ({tag}) -> {dest}")
+        print(f"  cloning {t.name} ({t.tag}) -> {dest}")
         rc = subprocess.run(
-            ["git", "clone", "--branch", tag, source, str(dest)]
+            ["git", "clone", "--branch", t.tag, t.source, str(dest)]
         ).returncode
         if rc != 0:
             failed += 1
-            print(f"  FAIL clone {name}", file=sys.stderr)
+            print(f"  FAIL clone {t.name}", file=sys.stderr)
             continue
+        if t.recursive_submodules:
+            print(f"  initializing submodules for {t.name}")
+            rc = subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(dest),
+                    "submodule",
+                    "update",
+                    "--init",
+                    "--recursive",
+                ]
+            ).returncode
+            if rc != 0:
+                failed += 1
+                print(f"  FAIL submodule init for {t.name}", file=sys.stderr)
+                continue
         head_proc = subprocess.run(
             ["git", "-C", str(dest), "rev-parse", "HEAD"],
             capture_output=True,
@@ -95,7 +141,7 @@ def _cmd_clone_sources(args: argparse.Namespace) -> int:
         )
         if head_proc.returncode != 0:
             failed += 1
-            print(f"  FAIL resolve HEAD for {name}", file=sys.stderr)
+            print(f"  FAIL resolve HEAD for {t.name}", file=sys.stderr)
             continue
         head = head_proc.stdout.strip()
         (dest / ".eigsep-blessed-commit").write_text(head + "\n")
