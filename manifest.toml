@@ -28,6 +28,13 @@ version = "3.1.1"
 tag     = "v3.1.1"
 source  = "https://github.com/EIGSEP/pico-firmware"
 sha256  = ""
+# The pico-firmware repo carries both the Python wrapper (picohost/)
+# and the C firmware source + build.sh. Clone the repo under its real
+# name so `cd ~/src/pico-firmware && vim src/foo.c` matches operator
+# muscle memory. `recursive_submodules` pulls pico-sdk + lib/cJSON
+# at image-build time so build.sh can run offline in the field.
+clone_path           = "pico-firmware"
+recursive_submodules = true
 
 [packages.eigsep-vna]
 pypi    = "eigsep-vna"
@@ -123,6 +130,20 @@ source  = "https://github.com/EIGSEP/pico-firmware"
 tag     = "v3.1.1"
 sha256  = ""
 roles   = ["panda"]
+
+[firmware.pico.build]
+# In-field rebuild target for `eigsep-field patch pico-firmware`. The
+# operator-visible name is the src_path (matches the repo name and the
+# clone destination from [packages.picohost].clone_path). The blessed
+# UF2 above is never overwritten — a field build lands at
+# /opt/eigsep/src/<src_path>/<artifact> and a systemd drop-in retargets
+# the service's --uf2 flag at it, so the path itself signals "this is
+# not blessed". `eigsep-field revert pico-firmware` drops the override
+# and flash-picos's the blessed UF2 back.
+src_path = "pico-firmware"
+script   = "build.sh"
+artifact = "build/pico_multi.uf2"
+service  = "picomanager.service"
 
 [firmware.rfsoc_bitstream]
 # Produced by a script in eigsep_dac; flashed to the RFSoC. eigsep_dac is

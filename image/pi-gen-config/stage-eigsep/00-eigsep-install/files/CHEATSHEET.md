@@ -41,9 +41,31 @@ Homedir shortcuts (symlinks into /opt/eigsep):
     sudo eigsep-field patch eigsep_observing       # editable install + restart
     # verify the fix actually works
 
+## Pico firmware (edit .c, rebuild UF2, reflash)
+
+The pico-firmware C source lives at ~/src/pico-firmware (picohost's
+Python wrapper is in the same tree). Reflash via USB CDC — no BOOTSEL
+button is reachable in the field.
+
+    cd ~/src/pico-firmware
+    git checkout -b field-fix-NNN
+    vim src/...                          # edit .c
+    git commit -am "field fix: <one-liner>"
+    sudo eigsep-field patch pico-firmware
+      # builds build/pico_multi.uf2, stops picomanager, flash-picos's
+      # the new UF2, writes /etc/systemd/system/picomanager.service.d/
+      # eigsep-patch.conf retargeting --uf2, restarts the service.
+    eigsep-field doctor                   # shows the active drop-in
+
+WARNING: a field-built UF2 must keep picotool's USB stdio config
+enabled. Without it, the next flash-picos can't trigger BOOTSEL and
+the pico is unrecoverable without physical access. Don't disable
+`PICO_STDIO_USB` or `pico_enable_stdio_usb` in CMakeLists.
+
 ## Revert (the patch was wrong)
 
     sudo eigsep-field revert eigsep_observing      # one sibling
+    sudo eigsep-field revert pico-firmware         # drop override + reflash blessed
     sudo eigsep-field revert --all                 # everything back to blessed
 
 ## Capture (send the fix back to base)

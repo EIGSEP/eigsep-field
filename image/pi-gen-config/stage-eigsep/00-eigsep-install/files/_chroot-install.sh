@@ -13,6 +13,12 @@
 set -euo pipefail
 
 apt-get update
+# build-essential + gcc-arm-none-eabi + cmake + libusb-1.0 are the
+# cross-compile toolchain for in-field rebuilds of pico-firmware via
+# `eigsep-field patch pico-firmware`. The pico-sdk submodule is
+# pre-fetched alongside the pico-firmware clone (clone-sources reads
+# recursive_submodules from the manifest) so build.sh runs offline on
+# the Pi.
 apt-get install -y --no-install-recommends \
     python3 python3-venv python3-pip \
     redis-server \
@@ -21,7 +27,9 @@ apt-get install -y --no-install-recommends \
     picotool \
     xvfb \
     git curl \
-    vim-nox
+    vim-nox \
+    build-essential pkg-config libusb-1.0-0-dev cmake \
+    gcc-arm-none-eabi libstdc++-arm-none-eabi-newlib
 
 # Overlay dhcp configs after apt-get install, not before in 00-run.sh:
 # pre-existing conffiles in /etc trigger a dpkg prompt that fails under

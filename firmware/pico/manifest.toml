@@ -9,6 +9,13 @@ tag     = "v3.1.1"
 sha256  = ""
 roles   = ["panda"]
 
+[build]
+src_path = "pico-firmware"
+script   = "build.sh"
+artifact = "build/pico_multi.uf2"
+service  = "picomanager.service"
+
 # Notes:
 #   Targets: RP2350 (eigsep_dac uses RP2040 variants — separate artifact)
 #   Flash via: picotool load -f <asset> && picotool reboot
+#   Rebuild in field: `sudo eigsep-field patch pico-firmware`
