@@ -77,6 +77,35 @@ in the Pi — but the operator never touches that path directly.
 matching services, pins eth0 to the role's static IP, and
 self-disables.
 
+## 3.5. (panda only) Install the CMT VNA binary
+
+CMT's `cmtvna` is proprietary and cannot be redistributed under
+eigsep-field's MIT license, so it ships out-of-band: download once on a
+machine with internet, copy to the Pi, then run the install helper.
+The image pre-creates `/opt/eigsep/cmt-vna/` with operator ownership;
+`cmtvna.service` will crash-loop on a fresh panda until this step
+completes.
+
+On a machine with internet (the URL pin lives in `manifest.toml`
+under `[external.cmtvna]`):
+
+```
+curl -OL 'https://coppermountaintech.com/wp-content/uploads/2026/05/cmtvna-1.7.1-linux-aarch64.tar.gz.zip'
+scp cmtvna-1.7.1-linux-aarch64.tar.gz.zip eigsep@10.10.10.11:/tmp/
+```
+
+On the panda Pi:
+
+```
+sudo /opt/eigsep/src/eigsep-field/scripts/install-cmtvna.sh \
+    /tmp/cmtvna-1.7.1-linux-aarch64.tar.gz.zip
+sudo systemctl restart cmtvna.service
+eigsep-field doctor      # cmtvna line should now be `ok`
+```
+
+If the Pi happens to have internet (lab bench, WiFi enabled by hand),
+run the script with no argument and it curls the URL itself.
+
 ## 4. Verify
 
 On the new Pi:

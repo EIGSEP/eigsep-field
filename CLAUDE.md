@@ -179,6 +179,51 @@ uniform across Pis; per-Pi differentiation is the role set in
    and semantic parity with upstream. CI enforces this via the
    `services-drift` job.
 
+## When adding an external (non-redistributable) binary
+
+`[external.*]` entries describe userspace binaries we cannot redistribute
+under eigsep-field's MIT license (proprietary vendor builds — `cmtvna`
+is the current example). The image build pre-creates the install
+directory with `eigsep:eigsep` ownership; the operator stages the
+unpacked tree once after first boot via the per-binary install script.
+Distinct from `[firmware.*]`, which is for blobs we *do* ship in
+release artifacts.
+
+To add one:
+
+1. Add `[external.<name>]` to `manifest.toml` with:
+   - `version` — pinned upstream version (informational; doctor reports it).
+   - `url` — vendor's CDN URL for the archive. Stays vendor-controlled;
+     a break surfaces as a script-level failure, not a build-time one.
+   - `sha256` — optional, populated after first hand-validation. Empty
+     means re-running the install accepts whatever the vendor currently
+     serves.
+   - `install_path` — directory the unpacked tree lands in (canonical:
+     `/opt/eigsep/<name>`). Pre-created by `_chroot-install.sh` with
+     operator ownership.
+   - `binary` — path to the executable relative to `install_path`.
+     `doctor` checks that this exists and is executable.
+   - `roles = [...]` — Pi roles that import the binary at runtime.
+     Same semantics as `[firmware.*].roles` / `[hardware.*].roles`.
+2. Add `scripts/install-<name>.sh` mirroring `install-cmtvna.sh`:
+   reads `[external.<name>]` from the manifest, accepts either a
+   positional local path or fetches the URL, unpacks, stages under
+   `install_path`, chowns/chmods. Supports `--check` so doctor can
+   probe presence cheaply.
+3. Pre-create the install dir in
+   `image/pi-gen-config/stage-eigsep/00-eigsep-install/files/_chroot-install.sh`
+   alongside the other operator-owned dirs.
+4. `eigsep-field info` / `doctor` pick the entry up automatically via
+   the `manifest["external"]` table.
+5. Add an "Installing the <name> binary" section to
+   `docs/operator/new-pi.md` (or the role-specific runbook) so the
+   step is part of the bring-up checklist.
+
+The local-file install mode is the expected operator path: the field
+image ships WiFi disabled and the panda Pi's only LAN reach is the
+eigsep `10.10.10.0/24`, so the operator downloads on a laptop and
+`scp`s the archive over.
+
 ## When a sibling edits a contract surface (keys, SENSOR_SCHEMAS)
 
 Interface docs (`docs/interface/redis-keys.md`, `sensor-schemas.md`) carry
