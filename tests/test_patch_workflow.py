@@ -599,3 +599,54 @@ def test_doctor_firmware_patch_silent_without_dropin(
 
     notes = _check_firmware_patches(manifest)
     assert notes == []
+
+
+# ----- CLI src / capture: firmware target awareness -----
+
+
+def test_cli_src_resolves_firmware_target(fake_firmware_env, capsys):
+    """`eigsep-field src pico-firmware` prints the shared clone path."""
+    from eigsep_field.cli import main
+
+    rc = main(["src", "pico-firmware"])
+    out = capsys.readouterr().out.strip()
+    assert rc == 0
+    assert out.endswith("/pico-firmware")
+
+
+def test_cli_src_unknown_lists_firmware_targets(capsys, tmp_path, monkeypatch):
+    """src accepts both — unknown error must list firmware targets too."""
+    monkeypatch.setattr("eigsep_field._patch.SRC_ROOT", tmp_path)
+    from eigsep_field.cli import main
+
+    rc = main(["src", "nope-not-a-thing"])
+    err = capsys.readouterr().err
+    assert rc == 2
+    assert "unknown target" in err
+    assert "pico-firmware" in err
+
+
+def test_cli_capture_firmware_target_hints_sibling(fake_firmware_env, capsys):
+    """`capture pico-firmware` → redirect to the shared-tree sibling."""
+    from eigsep_field.cli import main
+
+    rc = main(["capture", "pico-firmware"])
+    err = capsys.readouterr().err
+    assert rc == 2
+    assert "firmware target" in err
+    assert "picohost" in err
+    assert "eigsep-field capture picohost" in err
+
+
+def test_cli_capture_unknown_omits_firmware_targets(
+    capsys, tmp_path, monkeypatch
+):
+    """capture is siblings-only — unknown list must not advertise firmware."""
+    monkeypatch.setattr("eigsep_field._patch.SRC_ROOT", tmp_path)
+    from eigsep_field.cli import main
+
+    rc = main(["capture", "nope-not-a-thing"])
+    err = capsys.readouterr().err
+    assert rc == 2
+    assert "unknown target" in err
+    assert "pico-firmware" not in err
