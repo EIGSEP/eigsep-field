@@ -11,7 +11,7 @@ PartOf=eigsep-panda.target
 
 [Service]
 Environment=PYTHONUNBUFFERED=1
-ExecStart=/opt/eigsep/venv/bin/pico-manager --config /etc/eigsep/pico_config.json --uf2 /opt/eigsep/firmware/pico/pico_multi.uf2
+ExecStart=/opt/eigsep/venv/bin/pico-manager --uf2 /opt/eigsep/firmware/pico/pico_multi.uf2
 Restart=always
 RestartSec=5
 TimeoutStartSec=120
