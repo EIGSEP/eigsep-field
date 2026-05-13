@@ -69,6 +69,16 @@ jobs:
           python -c "import cmt_vna" || python -c "import eigsep_vna" || true
       - name: CLI info
         run: eigsep-field info
+      - name: Service unit CLI flag tripwire
+        # Each blessed sibling CLI is now on PATH (pip install . above);
+        # assert every long flag in a service unit's ExecStart is
+        # recognized by the binary's argparse. Guards against the
+        # picohost-v3.1.1-style regression where a unit ships an argv
+        # flag the CLI no longer accepts. pytest-timeout is required
+        # because pyproject.toml's addopts passes --timeout=60.
+        run: |
+          python -m pip install pytest pytest-timeout
+          pytest -q tests/test_service_cli_flags.py
 
   contract:
     # Install the blessed eigsep_observing at its manifest version and run
