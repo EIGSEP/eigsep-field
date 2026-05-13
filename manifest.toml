@@ -24,8 +24,8 @@ sha256  = ""
 
 [packages.picohost]
 pypi    = "picohost"
-version = "3.1.1"
-tag     = "v3.1.1"
+version = "3.2.0"
+tag     = "v3.2.0"
 source  = "https://github.com/EIGSEP/pico-firmware"
 sha256  = ""
 # The pico-firmware repo carries both the Python wrapper (picohost/)
@@ -124,10 +124,10 @@ version = "0.10.4"
 # pico-firmware's release-please.yml job that attaches it to the tagged
 # Release. Stable across releases; provenance is enforced by sha256 below.
 # Loaded by picomanager.service which only runs on the panda Pi.
-version = "v3.1.1"
+version = "v3.2.0"
 asset   = "pico_multi.uf2"
 source  = "https://github.com/EIGSEP/pico-firmware"
-tag     = "v3.1.1"
+tag     = "v3.2.0"
 sha256  = ""
 roles   = ["panda"]
 
@@ -244,7 +244,7 @@ activation  = "role"
 role        = "panda"
 source      = "https://github.com/EIGSEP/pico-firmware"
 # Must match [packages.picohost].tag — enforced by check-services-drift.
-tag         = "v3.1.1"
+tag         = "v3.2.0"
 source_path = "picohost/pico-manager.service"
 
 [services.cmtvna]
