@@ -143,7 +143,12 @@ fi
 tar -xzf "$inner" -C "$WORK/unz"
 
 # Find the directory containing bin/cmtvna inside the unpacked tree.
-src_root=$(dirname "$(find "$WORK/unz" -path '*/bin/cmtvna' -print -quit)")
+cmtvna_path=$(find "$WORK/unz" -path '*/bin/cmtvna' -print -quit)
+if [[ -z "$cmtvna_path" ]]; then
+    echo "bin/cmtvna not found in archive (looked in $WORK/unz)" >&2
+    exit 1
+fi
+src_root=$(dirname "$cmtvna_path")
 src_root=$(dirname "$src_root")
 if [[ ! -x "$src_root/bin/cmtvna" ]]; then
     echo "bin/cmtvna not found in archive (looked in $WORK/unz)" >&2

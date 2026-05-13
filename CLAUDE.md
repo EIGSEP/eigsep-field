@@ -208,8 +208,9 @@ To add one:
 2. Add `scripts/install-<name>.sh` mirroring `install-cmtvna.sh`:
    reads `[external.<name>]` from the manifest, accepts either a
    positional local path or fetches the URL, unpacks, stages under
-   `install_path`, chowns/chmods. Supports `--check` so doctor can
-   probe presence cheaply.
+   `install_path`, chowns/chmods. May support `--check` as a
+   lightweight operator/script self-test; `eigsep-field doctor`
+   verifies `install_path/binary` directly.
 3. Pre-create the install dir in
    `image/pi-gen-config/stage-eigsep/00-eigsep-install/files/_chroot-install.sh`
    alongside the other operator-owned dirs.

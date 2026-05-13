@@ -226,7 +226,8 @@ def _check_external(
         if not binary.is_file():
             problems.append(
                 f"{name}: missing {binary} "
-                f"(operator install: sudo install-{name}.sh)"
+                f"(operator install: "
+                f"sudo /opt/eigsep/src/eigsep-field/scripts/install-{name}.sh)"
             )
             continue
         if not os.access(binary, os.X_OK):
