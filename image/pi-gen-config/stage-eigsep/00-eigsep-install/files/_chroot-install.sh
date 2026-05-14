@@ -19,6 +19,18 @@ apt-get update
 # pre-fetched alongside the pico-firmware clone (clone-sources reads
 # recursive_submodules from the manifest) so build.sh runs offline on
 # the Pi.
+#
+# The cmtvna line is the Qt 6 / GL runtime the proprietary cmtvna
+# binary ([external.cmtvna]) needs. It ships a vendored Qt 6.10.2 with
+# RUNPATH=$ORIGIN/../../lib, but its xcb platform plugin
+# (plugins/platforms/libqxcb.so) and the libQt6XcbQpa chain pull in a
+# pile of system libs that aren't in the vendored tree. The system
+# packages fall in via the RUNPATH fall-through. Upstream's README
+# assumes Trixie Desktop; this image is Lite, so none of this stack
+# arrives transitively. Set derived from
+# `ldd /opt/eigsep/cmt-vna/bin/cmtvna` plus
+# `ldd /opt/eigsep/cmt-vna/plugins/platforms/libqxcb.so` on
+# cmtvna 1.7.1.
 apt-get install -y --no-install-recommends \
     python3 python3-venv python3-pip \
     redis-server \
@@ -26,6 +38,9 @@ apt-get install -y --no-install-recommends \
     chrony \
     picotool \
     xvfb \
+    libegl1 libopengl0 libfontconfig1 \
+    libxkbcommon0 libxkbcommon-x11-0 \
+    libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxcb-shape0 libxcb-xkb1 \
     git curl \
     vim-nox \
     build-essential pkg-config libusb-1.0-0-dev cmake \
