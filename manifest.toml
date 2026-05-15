@@ -231,6 +231,16 @@ kind       = "apt"
 unit       = "chrony.service"
 activation = "always"
 
+[services.chrony_wait]
+# Type=oneshot, RemainAfterExit=yes. Blocks boot until chronyd has
+# converged to <0.1s of true time (or 3 min timeout). eigsep-observe
+# and eigsep-observe-writer order against it so sync_time = time.time()
+# lands on a disciplined clock. Ships with the chrony apt package; no
+# extra install needed.
+kind       = "apt"
+unit       = "chrony-wait.service"
+activation = "always"
+
 [services.isc_dhcp]
 kind       = "apt"
 unit       = "isc-dhcp-server.service"
