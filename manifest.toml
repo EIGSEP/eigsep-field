@@ -257,12 +257,6 @@ source      = "https://github.com/EIGSEP/CMT-VNA"
 tag         = "v1.3.0"
 source_path = "scripts/cmtvna.service"
 
-[services.eigsep_panda]
-kind       = "local"
-unit       = "eigsep-panda.service"
-activation = "role"
-role       = "panda"
-
 [services.eigsep_observe]
 # SNAP supervisor: wraps fpga_init.py --reinit -p with Restart=on-failure
 # so casperfpga register-read timeouts (SNAP rebooted, bitstream gone)

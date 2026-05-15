@@ -33,10 +33,11 @@ permalink below.
 | `eigsep_observe_writer`  | [eigsep_observing / deploy/systemd/eigsep-observe-writer.service](https://github.com/EIGSEP/eigsep_observing/blob/v2.0.0/deploy/systemd/eigsep-observe-writer.service) |
 
 `redis-server` and `isc-dhcp-server` are apt-provided (no unit file
-shipped here). `eigsep-panda.service` and the role targets
-(`eigsep-panda.target`, `eigsep-backend.target`) plus
-`eigsep-first-boot.service` are eigsep-field-owned — no sibling
-authority, no drift tracking.
+shipped here). The role targets (`eigsep-panda.target`,
+`eigsep-backend.target`) and `eigsep-first-boot.service` are
+eigsep-field-owned — no sibling authority, no drift tracking. The
+panda-side observing entry point (`panda_observe`) is operator-launched
+rather than systemd-supervised; see the eigsep_observing OPERATIONS doc.
 
 ## Structure of each doc
 

@@ -21,8 +21,9 @@ Limitations:
   in unit-file review.
 - ``xvfb-run <flags> <real-binary>`` and ``python -m <module>`` units
   are skipped — the wrapper's flags would be compared against the
-  wrong CLI. Two units today rely on these (``cmtvna.service``,
-  ``eigsep-panda.service``). Revisit if a third wrapper shows up.
+  wrong CLI. ``cmtvna.service`` is the only unit on the image today
+  that uses a wrapper (``xvfb-run``). Revisit if a second wrapper
+  shows up.
 """
 
 from __future__ import annotations
