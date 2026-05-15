@@ -31,6 +31,11 @@ apt-get update
 # `ldd /opt/eigsep/cmt-vna/bin/cmtvna` plus
 # `ldd /opt/eigsep/cmt-vna/plugins/platforms/libqxcb.so` on
 # cmtvna 1.7.1.
+#
+# The network-debug line (arp-scan tcpdump ...) is operator convenience
+# for bring-up on the field LAN: ARP sweeps, packet capture, path/DNS
+# checks. Not declared in manifest.toml — apt-only userland with no
+# Python/firmware/binary surface to track.
 apt-get install -y --no-install-recommends \
     python3 python3-venv python3-pip \
     redis-server \
@@ -43,6 +48,7 @@ apt-get install -y --no-install-recommends \
     libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxcb-shape0 libxcb-xkb1 \
     git curl \
     vim-nox \
+    arp-scan tcpdump tshark nmap mtr-tiny traceroute iputils-arping dnsutils \
     build-essential pkg-config libusb-1.0-0-dev cmake \
     gcc-arm-none-eabi libstdc++-arm-none-eabi-newlib
 
