@@ -1,0 +1,11 @@
+# Raspberry Pi Pico (vendor 0x2e8a). Without raw libusb access,
+# picotool / flash-picos can't send reboot-to-BOOTSEL to the
+# CDC-mode device (PID 0009) and fails with "no BOOTSEL device with
+# that serial" — see issue #30. Mirrors what pico-firmware/CLAUDE.md
+# documents; uses MODE=0666 to match the usb-cmt-vna.rules style
+# instead of picotool's upstream plugdev/uaccess rule. The
+# ModemManager ignore on the tty side keeps MM from probing the CDC
+# interface (which would also block reboot-to-BOOTSEL and can
+# corrupt the JSON status stream picohost reads).
+SUBSYSTEM=="usb", ATTRS{idVendor}=="2e8a", MODE="0666"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="2e8a", ENV{ID_MM_DEVICE_IGNORE}="1"
