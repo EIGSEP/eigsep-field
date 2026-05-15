@@ -1,6 +1,6 @@
 [Unit]
-Description=EIGSEP panda role (antenna-side: Pico + VNA + PandaClient)
-Wants=redis-server.service eigsep-panda.service picomanager.service cmtvna.service
+Description=EIGSEP panda role plumbing (antenna-side Pico + VNA bridges; operator launches panda_observe manually)
+Wants=redis-server.service picomanager.service cmtvna.service
 After=network-online.target
 
 [Install]
