@@ -68,6 +68,12 @@ install -d "${ROOTFS_DIR}/etc/udev/rules.d"
 install -m 0644 files/udev/usb-cmt-vna.rules \
     "${ROOTFS_DIR}/etc/udev/rules.d/usb-cmt-vna.rules"
 
+# Raspberry Pi Pico udev rules. picotool / flash-picos need raw libusb
+# access to send reboot-to-BOOTSEL to the CDC-mode device; without
+# this rule the operator has to run flash-picos under sudo (issue #30).
+install -m 0644 files/udev/usb-pico.rules \
+    "${ROOTFS_DIR}/etc/udev/rules.d/usb-pico.rules"
+
 # uv config: pin uv to the on-disk wheelhouse and forbid any network
 # index lookups. eigsep-field revert calls `uv sync` against this.
 install -m 0644 files/etc-eigsep/uv.toml \
