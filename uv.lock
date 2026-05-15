@@ -225,7 +225,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "build", marker = "extra == 'dev'" },
-    { name = "eigsep-observing", specifier = "==2.2.0" },
+    { name = "eigsep-observing", specifier = "==2.3.0" },
     { name = "eigsep-redis", specifier = "==2.1.1" },
     { name = "eigsep-vna", specifier = "==1.3.0" },
     { name = "ipython", marker = "extra == 'debug'", specifier = "==9.13.0" },
@@ -242,7 +242,7 @@ provides-extras = ["debug", "dev"]
 
 [[package]]
 name = "eigsep-observing"
-version = "2.2.0"
+version = "2.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "eigsep-redis" },
@@ -254,9 +254,9 @@ dependencies = [
     { name = "plotly" },
     { name = "pyyaml" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/51/31/7513634bae85096cecb61dcb3b96fb48a5791ff295f23372c2fafa3852ae/eigsep_observing-2.2.0.tar.gz", hash = "sha256:ad7b64e50a2a999615b6207c493a4c45b4cb61e44895a06844983684997ef821", size = 1700654, upload-time = "2026-05-13T20:46:53.894Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/eb/c8/bf73367ea0a86331b28438eb4bc1d55422fc5c3eb34e312ca8eefef83450/eigsep_observing-2.3.0.tar.gz", hash = "sha256:5fc7b43bea4513b6f4aba41b160af003e7f1fb509e38b27e5e9d7f048dbfc018", size = 1702029, upload-time = "2026-05-15T23:22:03.241Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/89/ae/4a0f01315c595941fda9a8fe7615d270af0eccfdff803110cfcd37abed6b/eigsep_observing-2.2.0-py3-none-any.whl", hash = "sha256:aeaaae43d939e6eb9a0d17d109a41d13eb8e9b9ce95421e2b34419d193f26208", size = 1598630, upload-time = "2026-05-13T20:46:51.374Z" },
+    { url = "https://files.pythonhosted.org/packages/58/be/c3b8ed56e995c721e29a5ccddda005865af804fa2ca1aa2058eefc7b47ce/eigsep_observing-2.3.0-py3-none-any.whl", hash = "sha256:e41b4dffc5c928fb5508c6b98e73a3157f7e70a10bd1ff4074bd85472daedd99", size = 1600766, upload-time = "2026-05-15T23:22:01.56Z" },
 ]
 
 [[package]]
