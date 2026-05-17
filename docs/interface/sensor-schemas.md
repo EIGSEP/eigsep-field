@@ -61,34 +61,26 @@ Shared schema object — every listed sensor uses exactly the same fields.
 | `accel_z` | `float` | float → mean of non-error survivors |
 
 
-### `tempctrl`
+### `tempctrl_lna`, `tempctrl_load`
+
+Shared schema object — every listed sensor uses exactly the same fields.
 
 | Field | Type | Reduction |
 |---|---|---|
 | `sensor_name` | `str` | str → first if unanimous, else ``UNKNOWN`` |
+| `status` | `str` | str → first if unanimous, else ``UNKNOWN`` |
 | `app_id` | `int` | int → min of non-error survivors (expected invariant) |
 | `watchdog_tripped` | `bool` | bool → any of non-error survivors |
 | `watchdog_timeout_ms` | `int` | int → min of non-error survivors (expected invariant) |
-| `LNA_status` | `str` | str → first if unanimous, else ``UNKNOWN`` |
-| `LNA_T_now` | `float` | float → mean of non-error survivors |
-| `LNA_timestamp` | `float` | float → mean of non-error survivors |
-| `LNA_T_target` | `float` | float → mean of non-error survivors |
-| `LNA_drive_level` | `float` | float → mean of non-error survivors |
-| `LNA_enabled` | `bool` | bool → any of non-error survivors |
-| `LNA_active` | `bool` | bool → any of non-error survivors |
-| `LNA_int_disabled` | `bool` | bool → any of non-error survivors |
-| `LNA_hysteresis` | `float` | float → mean of non-error survivors |
-| `LNA_clamp` | `float` | float → mean of non-error survivors |
-| `LOAD_status` | `str` | str → first if unanimous, else ``UNKNOWN`` |
-| `LOAD_T_now` | `float` | float → mean of non-error survivors |
-| `LOAD_timestamp` | `float` | float → mean of non-error survivors |
-| `LOAD_T_target` | `float` | float → mean of non-error survivors |
-| `LOAD_drive_level` | `float` | float → mean of non-error survivors |
-| `LOAD_enabled` | `bool` | bool → any of non-error survivors |
-| `LOAD_active` | `bool` | bool → any of non-error survivors |
-| `LOAD_int_disabled` | `bool` | bool → any of non-error survivors |
-| `LOAD_hysteresis` | `float` | float → mean of non-error survivors |
-| `LOAD_clamp` | `float` | float → mean of non-error survivors |
+| `T_now` | `float` | float → mean of non-error survivors |
+| `timestamp` | `float` | float → mean of non-error survivors |
+| `T_target` | `float` | float → mean of non-error survivors |
+| `drive_level` | `float` | float → mean of non-error survivors |
+| `enabled` | `bool` | bool → any of non-error survivors |
+| `active` | `bool` | bool → any of non-error survivors |
+| `int_disabled` | `bool` | bool → any of non-error survivors |
+| `hysteresis` | `float` | float → mean of non-error survivors |
+| `clamp` | `float` | float → mean of non-error survivors |
 
 
 ### `potmon`
