@@ -148,8 +148,9 @@ To add one:
 same semantics — the doctor's firmware blob check is gated identically
 (e.g. the rfsoc bitstream is only required on backend).
 
-Two optional fields on a `[packages.*]` or `[hardware.*]` entry change
-how `clone-sources` lays the tree out on the image:
+Three optional fields on a `[packages.*]` or `[hardware.*]` entry change
+how `clone-sources` lays the tree out on the image and how
+`eigsep-field patch` installs from it:
 
 - `clone_path = "<dir>"` — git-clones under
   `/opt/eigsep/src/<dir>/` instead of the default
@@ -157,6 +158,12 @@ how `clone-sources` lays the tree out on the image:
   differs from the Python package's name (e.g. `picohost` lives in
   the `pico-firmware` repo and the operator wants the on-disk path to
   match the repo).
+- `package_path = "<subdir>"` — relative to the cloned tree, the
+  directory containing `pyproject.toml`/`setup.py`. Used only by
+  `eigsep-field patch` (the editable install target). Capture/diff and
+  the `.git` existence check still target the clone root. Required
+  when the Python project sits below the repo root, as for picohost
+  inside `pico-firmware/picohost/`.
 - `recursive_submodules = true` — runs `git submodule update --init
   --recursive` after the clone so submodule trees (e.g. pico-sdk +
   lib/cJSON for pico-firmware) are present on the offline image.

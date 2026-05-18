@@ -326,6 +326,80 @@ def test_picohost_sibling_src_path_uses_clone_path(manifest):
     assert s.src_path.name == "pico-firmware"
 
 
+def test_picohost_sibling_package_path_uses_subdir(manifest):
+    """picohost's pyproject.toml lives at pico-firmware/picohost/ —
+    the editable-install target must be the subdir, not the repo root
+    (which has only build.sh + CMakeLists.txt for the C firmware).
+    Regression: ``eigsep-field patch picohost`` used to fail with
+    "not a Python project" because uv was pointed at the repo root.
+    """
+    from eigsep_field._patch import resolve_sibling
+
+    s = resolve_sibling(manifest, "picohost")
+    assert s is not None
+    assert s.package_path.parent.name == "pico-firmware"
+    assert s.package_path.name == "picohost"
+
+
+def test_default_package_path_equals_src_path(manifest):
+    """Siblings without an explicit `package_path` default to the
+    clone root, preserving prior behavior for everything but picohost.
+    """
+    from eigsep_field._patch import resolve_sibling
+
+    s = resolve_sibling(manifest, "eigsep_observing")
+    assert s is not None
+    assert s.package_path == s.src_path
+
+
+def test_flash_picos_bin_prefers_venv_install(monkeypatch, tmp_path):
+    """Sudo strips PATH to ``secure_path`` which excludes the venv's
+    bin dir, so a bare ``flash-picos`` invocation hits ENOENT. Verify
+    the helper resolves the venv-installed path when it exists.
+    Regression: 2026-05-18 first attempt at
+    ``sudo eigsep-field patch pico-firmware``.
+    """
+    from eigsep_field import _patch as P
+
+    venv = tmp_path / "venv"
+    (venv / "bin").mkdir(parents=True)
+    fp = venv / "bin" / "flash-picos"
+    fp.write_text("#!/bin/sh\n")
+    fp.chmod(0o755)
+    monkeypatch.setattr(P, "VENV_PATH", venv)
+    assert P._flash_picos_bin() == str(fp)
+
+
+def test_install_editable_targets_package_path(monkeypatch, tmp_path):
+    """``install_editable`` must pass ``package_path`` (not ``src_path``)
+    to ``uv pip install -e`` so picohost's subdir-anchored pyproject
+    is found.
+    """
+    from eigsep_field import _patch
+
+    captured: dict = {}
+
+    def fake_run_uv(*args):
+        captured["args"] = args
+        return 0
+
+    monkeypatch.setattr(_patch, "run_uv", fake_run_uv)
+
+    sibling = _patch.Sibling(
+        name="picohost",
+        pypi_name="picohost",
+        version="3.3.0",
+        tag="v3.3.0",
+        src_path=tmp_path / "pico-firmware",
+        package_path=tmp_path / "pico-firmware" / "picohost",
+    )
+    rc = _patch.install_editable(sibling)
+    assert rc == 0
+    assert captured["args"][-1] == str(
+        tmp_path / "pico-firmware" / "picohost"
+    )
+
+
 # ----- Firmware patch flow -----
 
 
@@ -420,7 +494,7 @@ def _make_run_recorder(fake_firmware_env, *, build_rc=0, flash_rc=0):
             artifact.parent.mkdir(exist_ok=True)
             artifact.write_text("field-uf2\n")
             return build_rc
-        if cmd[0] == "flash-picos":
+        if Path(cmd[0]).name == "flash-picos":
             return flash_rc
         return 0
 
@@ -443,8 +517,9 @@ def test_patch_firmware_happy_path(fake_firmware_env, monkeypatch, manifest):
     assert len(build_calls) == 1
     assert build_calls[0][1]["cwd"] == str(fake_firmware_env["src"])
 
-    # flash-picos pointed at the field UF2 (not blessed).
-    flash_calls = [c for c in calls if c[0][0] == "flash-picos"]
+    # flash-picos pointed at the field UF2 (not blessed). Match by
+    # basename: invocation is the absolute venv path on a real Pi.
+    flash_calls = [c for c in calls if Path(c[0][0]).name == "flash-picos"]
     assert len(flash_calls) == 1
     assert flash_calls[0][0][2] == str(t.field_uf2)
 
@@ -476,7 +551,7 @@ def test_patch_firmware_build_failure_leaves_service_alone(
     rc = P.patch_firmware(t)
     assert rc == 2
     # No flash, no systemctl interactions, no drop-in.
-    assert all(c[0][0] != "flash-picos" for c in calls)
+    assert all(Path(c[0][0]).name != "flash-picos" for c in calls)
     assert sysctl_calls == []
     assert not t.drop_in_path.exists()
 
@@ -527,7 +602,7 @@ def test_revert_firmware_removes_dropin_and_reflashes_blessed(
     rc = P.revert_firmware(t)
     assert rc == 0
     assert not t.drop_in_path.exists()
-    flash = [c for c in calls if c[0][0] == "flash-picos"]
+    flash = [c for c in calls if Path(c[0][0]).name == "flash-picos"]
     assert len(flash) == 1
     assert flash[0][0][2] == str(t.blessed_uf2)
 
@@ -547,7 +622,7 @@ def test_revert_firmware_idempotent_when_no_dropin(
     t = P.resolve_firmware_target(manifest, "pico-firmware")
     rc = P.revert_firmware(t)
     assert rc == 0
-    flash = [c for c in calls if c[0][0] == "flash-picos"]
+    flash = [c for c in calls if Path(c[0][0]).name == "flash-picos"]
     assert len(flash) == 1
 
 

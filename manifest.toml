@@ -31,9 +31,13 @@ sha256  = ""
 # The pico-firmware repo carries both the Python wrapper (picohost/)
 # and the C firmware source + build.sh. Clone the repo under its real
 # name so `cd ~/src/pico-firmware && vim src/foo.c` matches operator
-# muscle memory. `recursive_submodules` pulls pico-sdk + lib/cJSON
-# at image-build time so build.sh can run offline in the field.
+# muscle memory. `package_path` points `eigsep-field patch picohost`
+# at the Python subdir whose pyproject.toml uv installs editable;
+# capture/diff and the `.git` check still target the repo root.
+# `recursive_submodules` pulls pico-sdk + lib/cJSON at image-build
+# time so build.sh can run offline in the field.
 clone_path           = "pico-firmware"
+package_path         = "picohost"
 recursive_submodules = true
 
 [packages.eigsep-vna]

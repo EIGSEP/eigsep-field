@@ -78,7 +78,9 @@ uv venv --seed --python "$PYTHON" "$VENV"
 
 # uv reads UV_CONFIG_FILE if set; the patch/revert helpers default it to
 # /etc/eigsep/uv.toml, which doesn't exist off-Pi. Point at a real (empty)
-# file so uv doesn't error on the missing default.
+# file during the build phase so uv doesn't error on the missing default
+# and so PyPI is reachable while we populate the wheelhouse. Step 6 swaps
+# it for an on-Pi-style config to actually exercise the offline path.
 UV_CONFIG="$WORK/uv.toml"
 : > "$UV_CONFIG"
 export UV_CONFIG_FILE="$UV_CONFIG"
@@ -98,6 +100,16 @@ uv pip compile \
     --quiet \
     --dest "$WHEELS" \
     -r "$WHEELS/requirements.txt"
+
+# PEP 517 build deps for siblings (setuptools.build_meta backends). Mirrors
+# the equivalent step in scripts/build-wheelhouse.sh — without these in
+# the wheelhouse, step 6's offline `eigsep-field patch` cannot resolve the
+# sibling's [build-system].requires under the on-Pi uv config.
+"$VENV/bin/pip" download \
+    --quiet \
+    --only-binary=:all: \
+    --dest "$WHEELS" \
+    'setuptools>=65' 'wheel'
 
 echo "=== step 3: build eigsep-field meta wheel"
 uv build --wheel --quiet --out-dir "$WHEELS"
@@ -130,6 +142,16 @@ export EIGSEP_WHEELS="$WHEELS"
 export EIGSEP_CAPTURES="$CAPTURES"
 export VIRTUAL_ENV="$VENV"
 EF="$VENV/bin/eigsep-field"
+
+# Mirror the on-Pi uv config (/etc/eigsep/uv.toml) for the patch phase so
+# the simulator actually exercises the offline constraint. Without this,
+# `uv pip install -e` falls through to PyPI for PEP 517 build deps and
+# masks real bugs in the wheelhouse (e.g. missing setuptools/wheel).
+cat > "$UV_CONFIG" <<EOF
+offline    = true
+no-index   = true
+find-links = ["$WHEELS"]
+EOF
 
 assert_rc() {
     local got=$1 want=$2 msg=$3

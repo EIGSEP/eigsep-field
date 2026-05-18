@@ -39,6 +39,15 @@ def main(argv: list[str]) -> int:
         if not matches:
             missing.append(f"{name}=={version} (hardware)")
 
+    # PEP 517 build deps for siblings whose `build-system.requires` lists
+    # setuptools + wheel. Required on the Pi: `eigsep-field patch` runs an
+    # editable install which triggers an isolated build, and the on-Pi uv
+    # config (offline + no-index + find-links=/opt/eigsep/wheels) means
+    # these wheels must be resolvable from this directory.
+    for name in ("setuptools", "wheel"):
+        if not list(wheel_dir.glob(f"{name}-*.whl")):
+            missing.append(f"{name} (build dep)")
+
     if missing:
         print("missing from wheelhouse:", file=sys.stderr)
         for m in missing:
