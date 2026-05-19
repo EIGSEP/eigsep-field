@@ -411,9 +411,11 @@ def fake_firmware_env(tmp_path, monkeypatch, manifest):
     src_root = tmp_path / "src"
     firmware_root = tmp_path / "firmware"
     systemd_root = tmp_path / "systemd"
+    venv = tmp_path / "venv"
     src_root.mkdir()
     (firmware_root / "pico").mkdir(parents=True)
     systemd_root.mkdir()
+    (venv / "bin").mkdir(parents=True)
 
     # The clone, with a fake .git/ dir so the .git existence check passes.
     src_path = src_root / "pico-firmware"
@@ -434,13 +436,22 @@ def fake_firmware_env(tmp_path, monkeypatch, manifest):
         "--uf2 /opt/eigsep/firmware/pico/pico_multi.uf2\n"
     )
 
+    # Picohost-installed flash-picos. _flash_picos_bin() returns None
+    # when neither the venv nor PATH has it, which makes patch/revert
+    # bail before the systemctl stop — see test_*_aborts_when_flash_*.
+    fp = venv / "bin" / "flash-picos"
+    fp.write_text("#!/bin/sh\nexit 0\n")
+    fp.chmod(0o755)
+
     monkeypatch.setattr("eigsep_field._patch.SRC_ROOT", src_root)
     monkeypatch.setattr("eigsep_field._patch.FIRMWARE_ROOT", firmware_root)
     monkeypatch.setattr("eigsep_field._patch.SYSTEMD_ETC_ROOT", systemd_root)
+    monkeypatch.setattr("eigsep_field._patch.VENV_PATH", venv)
     return {
         "src": src_path,
         "firmware": firmware_root,
         "systemd": systemd_root,
+        "venv": venv,
     }
 
 
@@ -552,6 +563,56 @@ def test_patch_firmware_build_failure_leaves_service_alone(
     assert all(Path(c[0][0]).name != "flash-picos" for c in calls)
     assert sysctl_calls == []
     assert not t.drop_in_path.exists()
+
+
+def test_patch_firmware_aborts_when_flash_picos_missing(
+    fake_firmware_env, monkeypatch, manifest
+):
+    """If picohost isn't installed, the patch flow must fail *before*
+    stopping the service. Otherwise subprocess.run raises
+    FileNotFoundError after the stop and bypasses the recovery paths
+    that restart it.
+    """
+    from eigsep_field import _patch as P
+
+    (fake_firmware_env["venv"] / "bin" / "flash-picos").unlink()
+    monkeypatch.setenv("PATH", "")
+
+    sysctl_calls: list[tuple] = []
+    monkeypatch.setattr(
+        P, "systemctl", lambda *a: sysctl_calls.append(a) or (0, "")
+    )
+    run_calls: list[tuple] = []
+    monkeypatch.setattr(
+        P, "_run", lambda cmd, **kw: run_calls.append((tuple(cmd), kw)) or 0
+    )
+
+    t = P.resolve_firmware_target(manifest, "pico-firmware")
+    rc = P.patch_firmware(t)
+    assert rc == 2
+    # Bailed before stopping the service.
+    assert sysctl_calls == []
+    # And before invoking the build script too — pre-flight is up front.
+    assert run_calls == []
+
+
+def test_revert_firmware_aborts_when_flash_picos_missing(
+    fake_firmware_env, monkeypatch, manifest
+):
+    from eigsep_field import _patch as P
+
+    (fake_firmware_env["venv"] / "bin" / "flash-picos").unlink()
+    monkeypatch.setenv("PATH", "")
+
+    sysctl_calls: list[tuple] = []
+    monkeypatch.setattr(
+        P, "systemctl", lambda *a: sysctl_calls.append(a) or (0, "")
+    )
+
+    t = P.resolve_firmware_target(manifest, "pico-firmware")
+    rc = P.revert_firmware(t)
+    assert rc == 2
+    assert sysctl_calls == []
 
 
 def test_patch_firmware_flash_failure_restarts_service_without_dropin(
