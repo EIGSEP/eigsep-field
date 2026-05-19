@@ -55,6 +55,43 @@ writer. It is safe because the field LAN (10.10.10.0/24) is physically
 isolated with no internet uplink. Do **not** copy this config to a Pi
 on a public network without adding `requirepass` first.
 
+## Getting WiFi on a DEV image
+
+DEV images (any non-blessed build — workflow_dispatch, rc-style tag,
+hotfix-test tag) ship with WiFi disabled, same as blessed. The image
+deliberately does not auto-configure a network because the blessed
+field deployment has no uplink. For lab/venue use on a DEV build, the
+operator brings up WiFi by hand after first boot:
+
+```bash
+# 1. Get a shell — via the role-pinned ethernet
+#    (ssh eigsep@10.10.10.10 for backend, .11 for panda) or HDMI+keyboard.
+
+# 2. Set the wireless regulatory country (one-time; persists). Pi-gen
+#    Trixie leaves the radio rfkill-blocked until a country is set —
+#    without this, nmcli accepts the connection but silently fails to
+#    associate. Default US; change as appropriate.
+sudo raspi-config nonint do_wifi_country US
+sudo rfkill unblock wifi
+
+# 3. Add + activate. --ask prompts for the PSK so it stays out of shell
+#    history and `ps` output.
+sudo nmcli --ask device wifi connect <SSID>
+
+# 4. Verify.
+nmcli connection show --active
+ip -4 addr show wlan0
+ping -c1 1.1.1.1
+```
+
+The connection persists as a keyfile under
+`/etc/NetworkManager/system-connections/<SSID>.nmconnection` (mode
+0600) and reconnects on every reboot. The role-pinned `eigsep-eth0`
+keyfile has `never-default=true`, so WiFi correctly takes the default
+route, and on backend the `isc-dhcp-server` stays bound to eth0 only.
+
+To remove: `sudo nmcli connection delete <SSID>`.
+
 ## Build locally
 
 Requires linux with root (for `losetup`/`mount`) or a VM. See
