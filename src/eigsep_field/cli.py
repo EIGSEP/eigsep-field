@@ -542,9 +542,10 @@ def _cmd_patch(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
         return 2
-    if not (sibling.package_path / "pyproject.toml").exists() and not (
-        sibling.package_path / "setup.py"
-    ).exists():
+    if (
+        not (sibling.package_path / "pyproject.toml").exists()
+        and not (sibling.package_path / "setup.py").exists()
+    ):
         print(
             f"no Python project at {sibling.package_path} "
             "(missing pyproject.toml / setup.py)",

@@ -395,9 +395,7 @@ def test_install_editable_targets_package_path(monkeypatch, tmp_path):
     )
     rc = _patch.install_editable(sibling)
     assert rc == 0
-    assert captured["args"][-1] == str(
-        tmp_path / "pico-firmware" / "picohost"
-    )
+    assert captured["args"][-1] == str(tmp_path / "pico-firmware" / "picohost")
 
 
 # ----- Firmware patch flow -----
