@@ -145,7 +145,27 @@ uv venv --python "$PY" --seed --quiet "$PIP_VENV"
 ./scripts/build-git-wheels.sh "$MANIFEST" "$OUT" "$PLATFORM"
 python3 scripts/hardware_requirements.py "$MANIFEST" "$OUT"
 
-# 4. Build the eigsep-field meta wheel itself into the wheelhouse, then
+# 4. Download PEP 517 build deps (setuptools, wheel) into the wheelhouse.
+#    Sibling source trees (eigsep_observing, eigsep_redis, picohost, ...)
+#    declare `build-system.requires = ["setuptools>=65", "wheel"]` and use
+#    setuptools.build_meta. `eigsep-field patch <sibling>` runs an editable
+#    install which triggers a PEP 517 isolated build, and the Pi's uv
+#    config (/etc/eigsep/uv.toml) forces offline+no-index+find-links so
+#    those build deps must be resolvable from $OUT. They aren't pulled
+#    transitively by the runtime resolve, so we fetch them explicitly.
+#    Pure-Python, single wheel each, serves any platform.
+#
+#    Runs *after* hardware_requirements.py so these build wheels don't get
+#    mistaken for hardware-introduced transitive deps and folded into
+#    hardware-requirements.txt (which install-field.sh feeds to
+#    `pip install --require-hashes`).
+"$PIP_VENV/bin/pip" download \
+    --quiet \
+    --only-binary=:all: \
+    --dest "$OUT" \
+    'setuptools>=65' 'wheel'
+
+# 5. Build the eigsep-field meta wheel itself into the wheelhouse, then
 #    append its pin + sha256 to requirements.txt so install-field.sh can
 #    install it offline under --require-hashes. Pure-Python, so a single
 #    wheel works on any platform.
@@ -171,8 +191,9 @@ with req.open("a") as f:
 print(f"appended eigsep-field=={version} to {req}")
 PY
 
-# 5. Sanity-check the wheelhouse contains every EIGSEP package at the
-#    manifest-blessed version (catches sdist-only edge cases).
+# 6. Sanity-check the wheelhouse contains every EIGSEP package at the
+#    manifest-blessed version (catches sdist-only edge cases) plus the
+#    PEP 517 build deps needed by `eigsep-field patch`.
 python3 scripts/check_wheelhouse.py "$MANIFEST" "$OUT"
 
 echo

@@ -542,8 +542,20 @@ def _cmd_patch(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
         return 2
+    if (
+        not (sibling.package_path / "pyproject.toml").exists()
+        and not (sibling.package_path / "setup.py").exists()
+    ):
+        print(
+            f"no Python project at {sibling.package_path} "
+            "(missing pyproject.toml / setup.py)",
+            file=sys.stderr,
+        )
+        return 2
     units = services_importing_package(manifest, sibling.pypi_name)
     print(f"sibling: {sibling.name} -> {sibling.src_path}")
+    if sibling.package_path != sibling.src_path:
+        print(f"python package:   {sibling.package_path}")
     print(f"editable install: {sibling.pypi_name}")
     if units:
         print(f"will restart: {', '.join(units)}")

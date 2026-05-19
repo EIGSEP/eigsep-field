@@ -8,9 +8,37 @@ manifest.toml.
 
 from __future__ import annotations
 
+import re
 import sys
 import tomllib
 from pathlib import Path
+
+# Lower bounds matching the `build-system.requires` declared by sibling
+# source trees (eigsep_observing, eigsep_redis, picohost, ...). If a
+# sibling raises its floor, raise it here too; a stale wheelhouse with
+# an older wheel would otherwise pass this check but fail the offline
+# editable install on the Pi.
+_BUILD_DEP_MIN = {"setuptools": (65,), "wheel": (0,)}
+
+_WHEEL_VERSION_RE = re.compile(
+    r"^(?P<name>[A-Za-z0-9_.]+)-(?P<version>[^-]+)-.+\.whl$"
+)
+
+
+def _parse_version(version: str) -> tuple[int, ...]:
+    """Return the leading numeric components of ``version`` as a tuple.
+
+    Stops at the first non-numeric segment (handles pre/post/dev suffixes
+    like ``75.6.0rc1``). Sufficient for setuptools/wheel which use plain
+    dotted-integer release versions.
+    """
+    parts: list[int] = []
+    for chunk in version.split("."):
+        m = re.match(r"\d+", chunk)
+        if not m:
+            break
+        parts.append(int(m.group()))
+    return tuple(parts)
 
 
 def main(argv: list[str]) -> int:
@@ -38,6 +66,31 @@ def main(argv: list[str]) -> int:
         matches = list(wheel_dir.glob(f"{name}-{version}-*.whl"))
         if not matches:
             missing.append(f"{name}=={version} (hardware)")
+
+    # PEP 517 build deps for siblings whose `build-system.requires` lists
+    # setuptools + wheel. Required on the Pi: `eigsep-field patch` runs an
+    # editable install which triggers an isolated build, and the on-Pi uv
+    # config (offline + no-index + find-links=/opt/eigsep/wheels) means
+    # these wheels must be resolvable from this directory.
+    for name, floor in _BUILD_DEP_MIN.items():
+        wheels = list(wheel_dir.glob(f"{name}-*.whl"))
+        if not wheels:
+            missing.append(f"{name} (build dep)")
+            continue
+        # A stale wheelhouse can hold an older wheel that satisfies the
+        # glob but is below the sibling build floor; reject it explicitly.
+        best = max(
+            (
+                _parse_version(m.group("version"))
+                for w in wheels
+                if (m := _WHEEL_VERSION_RE.match(w.name))
+            ),
+            default=(),
+        )
+        if best < floor:
+            min_str = ".".join(str(p) for p in floor)
+            best_str = ".".join(str(p) for p in best) if best else "?"
+            missing.append(f"{name}>={min_str} (build dep; found {best_str})")
 
     if missing:
         print("missing from wheelhouse:", file=sys.stderr)

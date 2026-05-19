@@ -41,13 +41,30 @@ BLESSED_COMMIT_FILE = ".eigsep-blessed-commit"
 
 @dataclass(frozen=True)
 class Sibling:
-    """Resolved manifest reference for a sibling source tree."""
+    """Resolved manifest reference for a sibling source tree.
+
+    ``src_path`` is the clone root (where ``.git`` lives — used by
+    capture/diff and the on-disk existence check). ``package_path`` is
+    the directory containing ``pyproject.toml`` and is what gets passed
+    to ``uv pip install -e``. For most siblings the two are identical;
+    they diverge when ``package_path`` is set in the manifest, as on the
+    picohost entry whose Python project sits at
+    ``pico-firmware/picohost/`` while ``.git`` lives at the repo root.
+    """
 
     name: str
     pypi_name: str
     version: str
     tag: str
     src_path: Path
+    package_path: Path
+
+
+def _sibling_paths(entry: dict, name: str) -> tuple[Path, Path]:
+    src_path = SRC_ROOT / entry.get("clone_path", name)
+    sub = entry.get("package_path")
+    package_path = src_path / sub if sub else src_path
+    return src_path, package_path
 
 
 def all_siblings(manifest: dict) -> list[Sibling]:
@@ -57,27 +74,33 @@ def all_siblings(manifest: dict) -> list[Sibling]:
     but operators don't patch/revert it as a sibling. ``clone_path`` on
     the manifest entry overrides the on-disk directory name — see the
     picohost entry which lives under ``pico-firmware/`` because that's
-    the repo it shares with the C firmware source.
+    the repo it shares with the C firmware source. ``package_path``
+    further narrows to the subdir holding ``pyproject.toml`` when the
+    Python package isn't at the repo root.
     """
     out: list[Sibling] = []
     for name, entry in manifest.get("packages", {}).items():
+        src_path, package_path = _sibling_paths(entry, name)
         out.append(
             Sibling(
                 name=name,
                 pypi_name=entry.get("pypi", name),
                 version=entry["version"],
                 tag=entry["tag"],
-                src_path=SRC_ROOT / entry.get("clone_path", name),
+                src_path=src_path,
+                package_path=package_path,
             )
         )
     for name, entry in manifest.get("hardware", {}).items():
+        src_path, package_path = _sibling_paths(entry, name)
         out.append(
             Sibling(
                 name=name,
                 pypi_name=name,
                 version=entry["version"],
                 tag=entry["tag"],
-                src_path=SRC_ROOT / entry.get("clone_path", name),
+                src_path=src_path,
+                package_path=package_path,
             )
         )
     return out
@@ -181,6 +204,26 @@ def _run(cmd: list[str], **kw) -> int:
     return subprocess.run(cmd, **kw).returncode
 
 
+def _flash_picos_bin() -> str | None:
+    """Resolve the ``flash-picos`` console script.
+
+    ``picohost`` installs it into ``VENV_PATH/bin/``, which is not on
+    sudo's ``secure_path``. Hard-resolve the venv copy before falling
+    back to PATH so ``sudo eigsep-field patch pico-firmware`` works
+    without ``sudo -E`` gymnastics. Mirrors ``_uv_bin()``.
+
+    Returns ``None`` when no resolvable binary exists, so callers can
+    fail loudly *before* stopping the service. Returning the bare
+    command name would cause ``subprocess.run`` to raise
+    ``FileNotFoundError`` after the stop, bypassing the recovery paths
+    in ``patch_firmware`` / ``revert_firmware`` that restart it.
+    """
+    venv_bin = VENV_PATH / "bin" / "flash-picos"
+    if venv_bin.exists():
+        return str(venv_bin)
+    return shutil.which("flash-picos")
+
+
 def patch_firmware(target: FirmwareTarget) -> int:
     """Build + reflash + drop-in retarget — the field hotfix flow.
 
@@ -198,6 +241,13 @@ def patch_firmware(target: FirmwareTarget) -> int:
     script = target.src_path / target.script
     if not script.exists():
         print(f"build script {script} not found", file=sys.stderr)
+        return 2
+    flash_bin = _flash_picos_bin()
+    if flash_bin is None:
+        print(
+            "flash-picos not found in venv or PATH; is picohost installed?",
+            file=sys.stderr,
+        )
         return 2
 
     print(f"building {target.name}: {script}")
@@ -222,7 +272,7 @@ def patch_firmware(target: FirmwareTarget) -> int:
         return rc
 
     print(f"flashing pico(s) with {target.field_uf2}")
-    rc = _run(["flash-picos", "--uf2", str(target.field_uf2)])
+    rc = _run([flash_bin, "--uf2", str(target.field_uf2)])
     if rc != 0:
         print(
             "flash failed; restarting service on blessed config",
@@ -266,6 +316,13 @@ def revert_firmware(target: FirmwareTarget) -> int:
     auto-flash branch) — picomanager skips the flash branch when Redis
     already has the picos, which is the common case post-patch.
     """
+    flash_bin = _flash_picos_bin()
+    if flash_bin is None:
+        print(
+            "flash-picos not found in venv or PATH; is picohost installed?",
+            file=sys.stderr,
+        )
+        return 2
     drop_in = target.drop_in_path
     if drop_in.exists():
         drop_in.unlink()
@@ -295,7 +352,7 @@ def revert_firmware(target: FirmwareTarget) -> int:
         systemctl("start", target.service_unit)
         return 1
     print(f"flashing pico(s) with blessed {target.blessed_uf2}")
-    rc = _run(["flash-picos", "--uf2", str(target.blessed_uf2)])
+    rc = _run([flash_bin, "--uf2", str(target.blessed_uf2)])
     if rc != 0:
         print(
             f"flash failed (rc={rc}); starting service anyway",
@@ -494,7 +551,7 @@ def install_editable(sibling: Sibling) -> int:
         "--no-deps",
         "--reinstall",
         "-e",
-        str(sibling.src_path),
+        str(sibling.package_path),
     )
 
 
