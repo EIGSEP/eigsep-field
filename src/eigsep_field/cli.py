@@ -801,9 +801,20 @@ def _cmd_apply_role(args: argparse.Namespace) -> int:
     targets = services_for_role(services, role_cfg.role)
 
     failed = 0
-    # Pin the static IP before role services come up — isc-dhcp-server
-    # binds to eth0 and needs the address ready first.
+    # Pin the static IP first so isc-dhcp-server can bind to eth0 when
+    # the role-services loop activates it below.
     failed += _apply_role_static_ip(role_cfg)
+
+    # Apply the chrony snippet *before* the role-services loop. The
+    # backend's eigsep-observe.service (and writer) declare
+    # ``Wants=/After=chrony-wait.service``, and chrony-wait blocks for
+    # up to 3 min waiting for chronyd to discipline the clock. Stock
+    # Debian chronyd has no ``server`` directive without our snippet
+    # symlinked into /etc/chrony/conf.d/, so on a fresh boot it has
+    # nothing to discipline against and chrony-wait runs out the full
+    # timeout — long enough to blow past eigsep-first-boot.service's
+    # TimeoutStartSec and SIGTERM the whole apply-role mid-run.
+    failed += _apply_chrony_snippet(role_cfg)
 
     for name, entry in targets:
         if entry.get("activation") != "role":
@@ -816,8 +827,6 @@ def _cmd_apply_role(args: argparse.Namespace) -> int:
         else:
             failed += 1
             print(f"  FAIL enable {unit} ({name}): {msg}", file=sys.stderr)
-
-    failed += _apply_chrony_snippet(role_cfg)
 
     _write_role_file(role_cfg)
 

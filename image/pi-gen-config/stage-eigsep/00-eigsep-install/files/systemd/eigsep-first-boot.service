@@ -15,6 +15,15 @@ Wants=network-online.target
 Type=oneshot
 ExecStart=/usr/local/bin/eigsep-field _apply-role
 RemainAfterExit=no
+# Defense in depth against chrony-wait's 3 min worst-case. apply-role
+# now applies the chrony snippet before pulling in role services (so
+# chronyd has the laptop / backend as upstream before chrony-wait
+# starts), but a cold boot with dead RTC and no NTP source still hits
+# chrony-wait's full timeout via eigsep-observe.service's
+# Wants=chrony-wait.service. systemd's default TimeoutStartSec=90s
+# would SIGTERM the python process mid-run; budget enough headroom for
+# the 3 min stall plus the rest of the apply.
+TimeoutStartSec=600
 
 [Install]
 WantedBy=multi-user.target
