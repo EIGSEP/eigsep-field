@@ -8,8 +8,6 @@ mutations and reports the mismatch.
 
 from __future__ import annotations
 
-from types import SimpleNamespace
-
 
 def _patch_role(monkeypatch, role: str | None) -> None:
     from eigsep_field import _services, cli
