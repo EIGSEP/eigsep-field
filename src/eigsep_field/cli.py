@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import os
+import re
 import subprocess
 import sys
 from importlib.metadata import PackageNotFoundError, version
@@ -44,6 +45,7 @@ from eigsep_field._services import (
     BOOT_ROLE_CONF,
     RoleConfig,
     entry_for_role,
+    hostnamectl,
     is_active,
     is_enabled,
     nmcli,
@@ -750,6 +752,54 @@ def _apply_role_static_ip(
     return 0
 
 
+def _apply_role_hostname(
+    role_cfg: RoleConfig, hosts_path: Path = Path("/etc/hosts")
+) -> int:
+    """Set the hostname to ``eigsep-<role>`` so the shell prompt and mDNS
+    differentiate the field Pis (``eigsep@eigsep-panda`` vs
+    ``eigsep@eigsep-backend``). Without this, both Pis come up as
+    ``eigsep@eigsep`` and ``eigsep.local`` collides on the LAN.
+
+    Also rewrites the 127.0.1.1 line in /etc/hosts so sudo doesn't warn
+    about an unresolved host. Idempotent: a second run with the same
+    role is a no-op.
+
+    Gated on the same role set as ``_apply_role_static_ip`` — the two
+    identity-pinning steps move in lockstep.
+    """
+    if role_cfg.role not in ROLE_STATIC_IPS:
+        return 0
+    new_hostname = f"eigsep-{role_cfg.role}"
+    rc, msg = hostnamectl("hostname", new_hostname)
+    if rc != 0:
+        print(
+            f"  warn: hostnamectl hostname failed: {msg}",
+            file=sys.stderr,
+        )
+        return 1
+    try:
+        text = hosts_path.read_text()
+    except OSError as e:
+        print(f"  warn: could not read {hosts_path}: {e}", file=sys.stderr)
+        return 1
+    new_text = re.sub(
+        r"^(127\.0\.1\.1\s+)\S+",
+        rf"\g<1>{new_hostname}",
+        text,
+        flags=re.MULTILINE,
+    )
+    if new_text != text:
+        try:
+            hosts_path.write_text(new_text)
+        except OSError as e:
+            print(
+                f"  warn: could not write {hosts_path}: {e}", file=sys.stderr
+            )
+            return 1
+    print(f"  {role_cfg.role}: hostname -> {new_hostname}")
+    return 0
+
+
 def _apply_chrony_snippet(role_cfg: RoleConfig) -> int:
     """Symlink the role-appropriate chrony snippet and reload chrony.
 
@@ -804,6 +854,9 @@ def _cmd_apply_role(args: argparse.Namespace) -> int:
     # Pin the static IP first so isc-dhcp-server can bind to eth0 when
     # the role-services loop activates it below.
     failed += _apply_role_static_ip(role_cfg)
+
+    # Differentiate the two Pis at the prompt and on mDNS.
+    failed += _apply_role_hostname(role_cfg)
 
     # Apply the chrony snippet *before* the role-services loop. The
     # backend's eigsep-observe.service (and writer) declare

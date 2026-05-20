@@ -123,6 +123,104 @@ def test_nmcli_up_failure_returns_nonzero(tmp_path, fake_nmcli):
     assert rc == 1
 
 
+@pytest.fixture
+def fake_hostnamectl(monkeypatch):
+    """Capture hostnamectl calls; default to success."""
+    calls: list[tuple[str, ...]] = []
+    rcs: dict[tuple[str, ...], tuple[int, str]] = {}
+
+    def _hostnamectl(*args: str) -> tuple[int, str]:
+        calls.append(args)
+        return rcs.get(args, (0, ""))
+
+    from eigsep_field import cli
+
+    monkeypatch.setattr(cli, "hostnamectl", _hostnamectl)
+    return calls, rcs
+
+
+def _seed_hosts(path):
+    """Write a pi-gen default /etc/hosts so the rewrite has a target."""
+    path.write_text(
+        "127.0.0.1\tlocalhost\n"
+        "::1\t\tlocalhost ip6-localhost ip6-loopback\n"
+        "ff02::1\t\tip6-allnodes\n"
+        "ff02::2\t\tip6-allrouters\n"
+        "\n"
+        "127.0.1.1\teigsep\n"
+    )
+    return path
+
+
+def test_hostname_unknown_role_is_noop(tmp_path, fake_hostnamectl):
+    from eigsep_field.cli import _apply_role_hostname
+
+    hosts = _seed_hosts(tmp_path / "hosts")
+    calls, _ = fake_hostnamectl
+    rc = _apply_role_hostname(RoleConfig(role=None), hosts_path=hosts)
+    assert rc == 0
+    assert calls == []
+    assert "127.0.1.1\teigsep\n" in hosts.read_text()
+
+
+def test_hostname_backend(tmp_path, fake_hostnamectl):
+    from eigsep_field.cli import _apply_role_hostname
+
+    hosts = _seed_hosts(tmp_path / "hosts")
+    calls, _ = fake_hostnamectl
+    rc = _apply_role_hostname(RoleConfig(role="backend"), hosts_path=hosts)
+    assert rc == 0
+    assert ("hostname", "eigsep-backend") in calls
+    body = hosts.read_text()
+    assert "127.0.1.1\teigsep-backend\n" in body
+    # Other lines stay intact.
+    assert "127.0.0.1\tlocalhost\n" in body
+    assert "ff02::2\t\tip6-allrouters\n" in body
+
+
+def test_hostname_panda(tmp_path, fake_hostnamectl):
+    from eigsep_field.cli import _apply_role_hostname
+
+    hosts = _seed_hosts(tmp_path / "hosts")
+    calls, _ = fake_hostnamectl
+    rc = _apply_role_hostname(RoleConfig(role="panda"), hosts_path=hosts)
+    assert rc == 0
+    assert ("hostname", "eigsep-panda") in calls
+    assert "127.0.1.1\teigsep-panda\n" in hosts.read_text()
+
+
+def test_hostname_idempotent_when_already_correct(tmp_path, fake_hostnamectl):
+    from eigsep_field.cli import _apply_role_hostname
+
+    hosts = tmp_path / "hosts"
+    hosts.write_text("127.0.0.1\tlocalhost\n127.0.1.1\teigsep-panda\n")
+    rc = _apply_role_hostname(RoleConfig(role="panda"), hosts_path=hosts)
+    assert rc == 0
+    assert hosts.read_text() == (
+        "127.0.0.1\tlocalhost\n127.0.1.1\teigsep-panda\n"
+    )
+
+
+def test_hostnamectl_failure_returns_nonzero(tmp_path, fake_hostnamectl):
+    from eigsep_field.cli import _apply_role_hostname
+
+    hosts = _seed_hosts(tmp_path / "hosts")
+    _, rcs = fake_hostnamectl
+    rcs[("hostname", "eigsep-backend")] = (1, "operation not permitted")
+    rc = _apply_role_hostname(RoleConfig(role="backend"), hosts_path=hosts)
+    assert rc == 1
+    # /etc/hosts must not be rewritten if the hostname change itself failed.
+    assert "127.0.1.1\teigsep\n" in hosts.read_text()
+
+
+def test_hostname_handles_missing_hosts_file(tmp_path, fake_hostnamectl):
+    from eigsep_field.cli import _apply_role_hostname
+
+    missing = tmp_path / "no-such-hosts"
+    rc = _apply_role_hostname(RoleConfig(role="backend"), hosts_path=missing)
+    assert rc == 1
+
+
 def test_does_not_touch_dhcpcd_conf(tmp_path, fake_nmcli, monkeypatch):
     """Regression: the old implementation wrote /etc/dhcpcd.conf and
     restarted dhcpcd.service. Trixie has no dhcpcd unit; both must go."""
