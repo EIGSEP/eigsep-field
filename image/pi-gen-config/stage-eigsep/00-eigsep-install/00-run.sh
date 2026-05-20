@@ -31,6 +31,22 @@ for unit in files/systemd/*.service files/systemd/*.target; do
         "${ROOTFS_DIR}/etc/systemd/system/$(basename "$unit")"
 done
 
+# Drop-in directories (e.g. chrony-wait.service.d/) extend or override
+# units shipped by Debian packages — currently the [Install] section
+# that stock chrony-wait.service is missing. Must run before the chroot
+# installer's enable-always step so `systemctl enable` finds the
+# WantedBy and actually wires the unit into multi-user.target.
+for dir in files/systemd/*.service.d files/systemd/*.target.d; do
+    [ -d "$dir" ] || continue
+    name="$(basename "$dir")"
+    install -d "${ROOTFS_DIR}/etc/systemd/system/${name}"
+    for conf in "$dir"/*.conf; do
+        [ -f "$conf" ] || continue
+        install -m 0644 "$conf" \
+            "${ROOTFS_DIR}/etc/systemd/system/${name}/$(basename "$conf")"
+    done
+done
+
 # Stage chrony role snippets. eigsep-first-boot.service symlinks the
 # correct one into /etc/chrony/conf.d/eigsep.conf based on whether
 # /boot/firmware/eigsep-role.conf has role = backend (server) or not (client).
