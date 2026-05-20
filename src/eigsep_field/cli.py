@@ -420,7 +420,7 @@ def _cmd_doctor(_: argparse.Namespace) -> int:
 
 
 def _cmd_services(args: argparse.Namespace) -> int:
-    """List / restart / logs for blessed services."""
+    """List / status / start / stop / restart / logs for blessed services."""
     manifest = load_manifest()
     services = manifest.get("services", {})
     if args.action == "list":
@@ -447,7 +447,7 @@ def _cmd_services(args: argparse.Namespace) -> int:
             print(f"{name:<24} {unit:<32} {scope:<20} {state:<20}")
         return 0
 
-    # restart / logs / status target a specific service by manifest name.
+    # All non-list actions target a specific service by manifest name.
     if args.name not in services:
         print(
             f"unknown service {args.name!r}; see `eigsep-field services list`",
@@ -463,16 +463,30 @@ def _cmd_services(args: argparse.Namespace) -> int:
         return subprocess.run(
             ["systemctl", "status", unit, "--no-pager"]
         ).returncode
-    if args.action == "restart":
-        rc, msg = systemctl("restart", unit)
-        if rc != 0:
-            print(f"restart {unit} failed: {msg}", file=sys.stderr)
-        return rc
     if args.action == "logs":
         cmd = ["journalctl", "-u", unit]
         if args.follow:
             cmd.append("-f")
         return subprocess.run(cmd).returncode
+    if args.action in ("start", "stop", "restart"):
+        # The image is uniform — every Pi has every unit file installed —
+        # so without role gating, `services start eigsep_observe` from
+        # the panda Pi would happily try to drive the backend stack.
+        role_cfg = parse_role_file(ROLE_FILE)
+        expected = {n for n, _ in services_for_role(services, role_cfg.role)}
+        if args.name not in expected:
+            entry = services[args.name]
+            print(
+                f"refusing to {args.action} {args.name!r}: "
+                f"scope is role={entry.get('role', '?')}, "
+                f"this Pi's role is {role_cfg.role or '(unset)'}",
+                file=sys.stderr,
+            )
+            return 2
+        rc, msg = systemctl(args.action, unit)
+        if rc != 0:
+            print(f"{args.action} {unit} failed: {msg}", file=sys.stderr)
+        return rc
     raise AssertionError(f"unhandled services action: {args.action}")
 
 
@@ -897,12 +911,13 @@ def _cmd_apply_role(args: argparse.Namespace) -> int:
 
 def _add_services_parser(sub: argparse._SubParsersAction) -> None:
     p = sub.add_parser(
-        "services", help="list/status/restart/logs for blessed services"
+        "services",
+        help="list/status/start/stop/restart/logs for blessed services",
     )
     p.set_defaults(func=_cmd_services)
     svc_sub = p.add_subparsers(dest="action", required=True)
     svc_sub.add_parser("list", help="table of services + scope + state")
-    for action in ("status", "restart"):
+    for action in ("status", "start", "stop", "restart"):
         sp = svc_sub.add_parser(action, help=f"systemctl {action} <unit>")
         sp.add_argument(
             "name", help="manifest service name (e.g. picomanager)"
