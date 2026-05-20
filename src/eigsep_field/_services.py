@@ -88,6 +88,13 @@ def nmcli(*args: str) -> tuple[int, str]:
     return r.returncode, msg
 
 
+def hostnamectl(*args: str) -> tuple[int, str]:
+    """Run ``hostnamectl <args...>``; return (rc, combined stderr/stdout)."""
+    r = subprocess.run(["hostnamectl", *args], capture_output=True, text=True)
+    msg = (r.stderr or r.stdout).strip()
+    return r.returncode, msg
+
+
 def is_active(unit: str) -> bool:
     rc, _ = systemctl("is-active", "--quiet", unit)
     return rc == 0
