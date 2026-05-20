@@ -116,6 +116,13 @@ eigsep-field doctor     # role + service health
 eigsep-field services list
 ```
 
+The ssh prompt should read `eigsep@eigsep-panda` or
+`eigsep@eigsep-backend` — `_apply-role` sets the hostname to
+`eigsep-<role>` on first boot, so a prompt still reading `eigsep@eigsep`
+means the role-applier hasn't run. The Pi also advertises
+`eigsep-panda.local` / `eigsep-backend.local` over mDNS, so multiple
+field Pis no longer collide on `eigsep.local`.
+
 From the operator laptop or backend Pi, confirm reachability at the
 conventional address (`10.10.10.10` for backend, `10.10.10.11` for
 panda).
