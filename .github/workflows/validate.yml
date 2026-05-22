@@ -10,12 +10,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: astral-sh/setup-uv@v8.1.0
         with:
-          python-version: "3.13"
-      - run: python -m pip install ruff
-      - run: ruff check .
-      - run: ruff format --check .
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+      - run: uvx ruff check .
+      - run: uvx ruff format --check .
 
   manifest:
     runs-on: ubuntu-latest
