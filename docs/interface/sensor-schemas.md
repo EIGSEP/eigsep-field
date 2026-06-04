@@ -79,8 +79,13 @@ Shared schema object — every listed sensor uses exactly the same fields.
 | `enabled` | `bool` | bool → any of non-error survivors |
 | `active` | `bool` | bool → any of non-error survivors |
 | `int_disabled` | `bool` | bool → any of non-error survivors |
+| `stall_tripped` | `bool` | bool → any of non-error survivors |
+| `cooling_enabled` | `bool` | bool → any of non-error survivors |
 | `hysteresis` | `float` | float → mean of non-error survivors |
 | `clamp` | `float` | float → mean of non-error survivors |
+| `Kp` | `float` | float → mean of non-error survivors |
+| `Ki` | `float` | float → mean of non-error survivors |
+| `integral` | `float` | float → mean of non-error survivors |
 
 
 ### `potmon`
