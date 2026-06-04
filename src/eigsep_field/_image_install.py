@@ -93,6 +93,10 @@ def _clone_targets(manifest: dict) -> list[CloneTarget]:
     for name, entry in manifest.get("packages", {}).items():
         targets.append(CloneTarget.from_entry(name, entry))
     for name, entry in manifest.get("hardware", {}).items():
+        if "source" not in entry:
+            # PyPI-sdist hardware entries (e.g. lgpio) have no git
+            # tree; they ship only as wheels in the wheelhouse.
+            continue
         targets.append(CloneTarget.from_entry(name, entry))
     return targets
 

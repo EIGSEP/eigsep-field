@@ -56,7 +56,14 @@ def main(argv: list[str]) -> int:
             errors.append(f"PyPI missing: {name}=={version}")
 
     for key, entry in manifest.get("hardware", {}).items():
-        if not gh_has_tag(entry["source"], entry["tag"]):
+        if "pypi" in entry:
+            # PyPI-sdist hardware entry (e.g. lgpio): the artifact is
+            # the published sdist, not a git tag.
+            if not pypi_has(entry["pypi"], entry["version"]):
+                errors.append(
+                    f"PyPI missing: {entry['pypi']}=={entry['version']}"
+                )
+        elif not gh_has_tag(entry["source"], entry["tag"]):
             errors.append(
                 f"GH tag missing: {entry['source']} @ {entry['tag']}"
             )

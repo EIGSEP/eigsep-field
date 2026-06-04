@@ -127,6 +127,16 @@ meta package — ground stack code lazy-imports them — so CI/dev installs
 never fetch them. On the Pi, `install-field.sh` installs them from
 pre-built aarch64 wheels staged in the wheelhouse.
 
+A `[hardware.*]` entry can alternatively pin a package that IS on PyPI
+but has no usable wheel for the image's python (`lgpio`: wheels stop at
+cp312, image is py3.13, and the main resolve is `--only-binary` so the
+sdist can't ride along). Give it `pypi` + `version` instead of
+`source`/`tag`; `build-git-wheels.sh` cross-builds the wheel from the
+PyPI sdist in the same docker+qemu container. Such entries leave no git
+clone on the image — clone-sources, `eigsep-field patch`, and
+`simulate-field-pi.sh` skip them — and `verify_manifest.py` checks the
+sdist exists on PyPI instead of a GitHub tag.
+
 To add one:
 
 1. Add `[hardware.<name>]` to `manifest.toml` with `version`, `tag`,

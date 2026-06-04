@@ -79,6 +79,8 @@ def test_all_siblings_includes_packages_and_hardware(manifest):
     assert "eigsep_observing" in names
     assert "casperfpga" in names  # from [hardware.*]
     assert "eigsep-field" not in names  # self-clone is implicit
+    # PyPI-sdist hardware entries have no clone — not patchable.
+    assert "lgpio" not in names
 
 
 def test_resolve_sibling_by_toml_key(manifest):
@@ -295,8 +297,12 @@ def test_clone_targets_covers_siblings_not_self(manifest):
     names = [t.name for t in targets]
     for pkg in manifest["packages"]:
         assert pkg in names
-    for hw in manifest["hardware"]:
-        assert hw in names
+    for hw, entry in manifest["hardware"].items():
+        if "source" in entry:
+            assert hw in names
+        else:
+            # PyPI-sdist entries (e.g. lgpio) have no git tree to clone.
+            assert hw not in names
     # eigsep-field is staged from the runner's checkout in image.yml,
     # not cloned from upstream — see _image_install module docstring.
     assert "eigsep-field" not in names
