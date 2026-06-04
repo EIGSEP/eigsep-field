@@ -92,7 +92,7 @@ def all_siblings(manifest: dict) -> list[Sibling]:
             )
         )
     for name, entry in manifest.get("hardware", {}).items():
-        if "tag" not in entry:
+        if "source" not in entry:
             # PyPI-sdist hardware entries (e.g. lgpio) have no clone
             # on the image — nothing to patch/capture/revert.
             continue
