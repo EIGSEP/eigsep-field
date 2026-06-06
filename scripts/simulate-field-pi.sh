@@ -63,6 +63,11 @@ name = sys.argv[1]
 sib = m.get("packages", {}).get(name) or m.get("hardware", {}).get(name)
 if not sib:
     sys.exit(f"unknown sibling {name!r}; not in [packages.*] or [hardware.*]")
+if "source" not in sib:
+    sys.exit(
+        f"sibling {name!r} is a PyPI-sdist hardware entry "
+        "(no git source); nothing to simulate"
+    )
 print(sib["tag"], sib["source"], m["python"])
 PY
 )

@@ -92,6 +92,10 @@ def all_siblings(manifest: dict) -> list[Sibling]:
             )
         )
     for name, entry in manifest.get("hardware", {}).items():
+        if "source" not in entry:
+            # PyPI-sdist hardware entries (e.g. lgpio) have no clone
+            # on the image — nothing to patch/capture/revert.
+            continue
         src_path, package_path = _sibling_paths(entry, name)
         out.append(
             Sibling(

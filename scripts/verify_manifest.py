@@ -56,7 +56,34 @@ def main(argv: list[str]) -> int:
             errors.append(f"PyPI missing: {name}=={version}")
 
     for key, entry in manifest.get("hardware", {}).items():
-        if not gh_has_tag(entry["source"], entry["tag"]):
+        has_pypi = "pypi" in entry
+        has_source = "source" in entry
+        has_tag = "tag" in entry
+        has_any_git = has_source or has_tag
+        has_git_shape = has_source and has_tag
+
+        if has_pypi and has_any_git:
+            errors.append(
+                f"Invalid hardware entry shape ({key}): choose either pypi "
+                "or source+tag"
+            )
+            continue
+
+        if not has_pypi and not has_git_shape:
+            errors.append(
+                f"Invalid hardware entry shape ({key}): expected pypi or "
+                "source+tag"
+            )
+            continue
+
+        if has_pypi:
+            # PyPI-sdist hardware entry (e.g. lgpio): the artifact is
+            # the published sdist, not a git tag.
+            if not pypi_has(entry["pypi"], entry["version"]):
+                errors.append(
+                    f"PyPI missing: {entry['pypi']}=={entry['version']}"
+                )
+        elif not gh_has_tag(entry["source"], entry["tag"]):
             errors.append(
                 f"GH tag missing: {entry['source']} @ {entry['tag']}"
             )

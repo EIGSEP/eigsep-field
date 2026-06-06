@@ -84,6 +84,21 @@ tag     = "v0.7.2"
 source  = "https://github.com/EIGSEP/casperfpga"
 roles   = ["backend"]
 
+[hardware.lgpio]
+# gpiozero's pin-factory backend for Pi-side GPIO (picohost declares
+# gpiozero; gpiozero loads lgpio at first Device construction). lgpio
+# IS on PyPI, but its wheels stop at cp312 and the image runs py3.13 —
+# and the main resolve is --only-binary, so it can't ride along as a
+# normal dep of picohost. `pypi` (instead of source/tag) flags it for
+# build-git-wheels.sh's sdist cross-build: the sdist bundles the lg C
+# sources, setup.py statically links them under PYPI=1, and swig
+# (which generates the wrapper at build time) is in the build
+# container's apt list. No git clone lands on the image — patch /
+# clone-sources / simulate-field-pi skip pypi-style entries.
+pypi    = "lgpio"
+version = "0.2.2.0"
+roles   = ["panda"]
+
 # ---- Field-debug Python packages (PyPI, not part of the runtime stack).
 # Shipped in the wheelhouse via the `debug` extra so they're present on
 # field Pis with no internet, but NOT pulled by `pip install eigsep-field`

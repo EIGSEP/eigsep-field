@@ -1,7 +1,15 @@
 #!/usr/bin/env bash
-# Build off-PyPI hardware Python wheels declared in manifest.toml's
-# [hardware.*] table. One wheel per entry is written to $OUT, built for
-# the target platform (default: linux_aarch64, the field Pi nodes).
+# Build hardware Python wheels declared in manifest.toml's [hardware.*]
+# table. One wheel per entry is written to $OUT, built for the target
+# platform (default: linux_aarch64, the field Pi nodes).
+#
+# Two entry shapes:
+#   source + tag  — off-PyPI package; built from the EIGSEP git fork
+#                   (e.g. casperfpga).
+#   pypi          — on PyPI but with no usable wheel for the image's
+#                   python (e.g. lgpio: wheels stop at cp312, image is
+#                   py3.13, and the main resolve is --only-binary);
+#                   built from the published sdist.
 #
 # When the host architecture already matches the target, builds natively.
 # Otherwise cross-builds via docker with qemu-user emulation — so this
@@ -36,7 +44,10 @@ mapfile -t entries < <(python3 - "$MANIFEST" <<'EOF'
 import sys, tomllib
 m = tomllib.load(open(sys.argv[1], "rb"))
 for name, entry in m.get("hardware", {}).items():
-    print(f"{name}|{entry['source']}|{entry['tag']}|{entry['version']}")
+    if "pypi" in entry:
+        print(f"{name}|pypi|{entry['pypi']}||{entry['version']}")
+    else:
+        print(f"{name}|git|{entry['source']}|{entry['tag']}|{entry['version']}")
 EOF
 )
 
@@ -92,8 +103,13 @@ if [[ "$host_arch" != "$target_uname" ]]; then
 fi
 
 for line in "${entries[@]}"; do
-    IFS='|' read -r name source tag version <<< "$line"
-    echo "build-git-wheels: $name $tag (target $PLATFORM, py$PY)"
+    IFS='|' read -r name kind src tag version <<< "$line"
+    if [[ "$kind" == pypi ]]; then
+        echo "build-git-wheels: $name $version from PyPI sdist" \
+            "(target $PLATFORM, py$PY)"
+    else
+        echo "build-git-wheels: $name $tag (target $PLATFORM, py$PY)"
+    fi
 
     # Skip if already built.
     if ls "$abs_out/${name}-${version}-"*.whl >/dev/null 2>&1; then
@@ -107,17 +123,39 @@ for line in "${entries[@]}"; do
     # builds the hardware package itself plus downloads/builds wheels
     # for every transitive dep into $OUT, constrained against the main
     # resolve so overlapping packages (redis, IPython, …) stay aligned.
-    url="${source%.git}.git@${tag}"
+    #
+    # kind=pypi entries build from the published sdist instead of a
+    # git tag. `--no-binary <name>` pins the build to the sdist even
+    # if PyPI grows a wheel for some other interpreter, and PYPI=1 is
+    # lgpio's setup.py switch for statically linking its bundled lg C
+    # sources (without it the module dynamically links a system
+    # liblgpio the image doesn't have). swig is in the container's apt
+    # list for the same entry — lgpio generates its SWIG wrapper at
+    # build time. Native (non-cross) pypi builds need gcc + swig on
+    # the host.
+    docker_env_args=()
+    if [[ "$kind" == pypi ]]; then
+        spec="${src}==${version}"
+        inner_spec="--no-binary ${src} '${spec}'"
+        docker_env_args=(-e PYPI=1)
+    else
+        spec="git+${src%.git}.git@${tag}"
+        inner_spec="'${spec}'"
+    fi
     if [[ $cross -eq 1 ]]; then
         docker run --rm --platform "$docker_platform" \
             -v "$abs_out:/out" \
+            "${docker_env_args[@]}" \
             "python:${PY}-slim" \
             bash -c "set -e; \
                 apt-get update -q; \
-                DEBIAN_FRONTEND=noninteractive apt-get install -y -q --no-install-recommends git gcc build-essential; \
-                pip wheel --constraint /out/.constraints.txt --wheel-dir /out 'git+${url}'"
+                DEBIAN_FRONTEND=noninteractive apt-get install -y -q --no-install-recommends git gcc build-essential swig; \
+                pip wheel --constraint /out/.constraints.txt --wheel-dir /out ${inner_spec}"
+    elif [[ "$kind" == pypi ]]; then
+        PYPI=1 pip wheel --constraint "$constraints" \
+            --wheel-dir "$abs_out" --no-binary "$src" "$spec"
     else
-        pip wheel --constraint "$constraints" --wheel-dir "$abs_out" "git+${url}"
+        pip wheel --constraint "$constraints" --wheel-dir "$abs_out" "$spec"
     fi
 done
 
