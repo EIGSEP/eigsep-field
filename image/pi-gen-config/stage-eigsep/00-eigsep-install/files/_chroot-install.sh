@@ -48,6 +48,7 @@ apt-get install -y --no-install-recommends \
     libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxcb-shape0 libxcb-xkb1 \
     git curl \
     vim-nox \
+    screen \
     arp-scan tcpdump tshark nmap mtr-tiny traceroute iputils-arping dnsutils \
     build-essential pkg-config libusb-1.0-0-dev cmake \
     gcc-arm-none-eabi libstdc++-arm-none-eabi-newlib
