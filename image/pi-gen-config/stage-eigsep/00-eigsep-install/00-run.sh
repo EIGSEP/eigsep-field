@@ -77,6 +77,21 @@ install -d "${ROOTFS_DIR}/etc/redis/redis.conf.d"
 install -m 0644 files/redis/eigsep.conf \
     "${ROOTFS_DIR}/etc/redis/redis.conf.d/eigsep.conf"
 
+# Stage the role-conditional Redis persistence snippets.
+# eigsep-first-boot's _apply-role symlinks the matching one to
+# /etc/redis/redis.conf.d/eigsep-role.conf (ephemeral.conf on backend,
+# persistent.conf on every other role). Unlike chrony's confdir, a
+# redis `include` of a missing file is fatal at startup, so the image
+# ships the symlink pre-pointed at the persistent (stock-Debian)
+# default instead of leaving it dangling until first boot.
+install -d "${ROOTFS_DIR}/etc/eigsep/redis"
+for conf in files/redis/ephemeral.conf files/redis/persistent.conf; do
+    install -m 0644 "$conf" \
+        "${ROOTFS_DIR}/etc/eigsep/redis/$(basename "$conf")"
+done
+ln -sfn /etc/eigsep/redis/persistent.conf \
+    "${ROOTFS_DIR}/etc/redis/redis.conf.d/eigsep-role.conf"
+
 # CMT VNA udev rules. Mirrors cmt_vna/scripts/install_vna_rules.sh at
 # the manifest-pinned tag; without it the cmtvna binary picks the
 # SN0916 mock device and returns all zeros on real hardware.

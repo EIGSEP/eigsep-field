@@ -74,6 +74,21 @@ if ! grep -qF "redis.conf.d/eigsep.conf" /etc/redis/redis.conf; then
     } >> /etc/redis/redis.conf
 fi
 
+# Role-conditional persistence policy. The target is a symlink into
+# /etc/eigsep/redis/, shipped pointing at persistent.conf (stock
+# Debian behavior) and re-pointed by `eigsep-field _apply-role` at
+# first boot — ephemeral.conf on the backend Pi. A redis `include` of
+# a missing file is fatal at startup, which is why the image ships the
+# default symlink rather than deferring it to first boot.
+if ! grep -qF "redis.conf.d/eigsep-role.conf" /etc/redis/redis.conf; then
+    {
+        echo ""
+        echo "# EIGSEP role-conditional persistence — symlink managed by"
+        echo "# eigsep-field _apply-role; snippets in /etc/eigsep/redis/."
+        echo "include /etc/redis/redis.conf.d/eigsep-role.conf"
+    } >> /etc/redis/redis.conf
+fi
+
 python3 -m venv /opt/eigsep/venv
 # requirements.txt already pins eigsep-field==<release> with --hash
 # (appended by scripts/build-wheelhouse.sh step 4), so a single -r install

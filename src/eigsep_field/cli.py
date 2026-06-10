@@ -845,6 +845,56 @@ def _apply_chrony_snippet(role_cfg: RoleConfig) -> int:
     return 0
 
 
+REDIS_SNIPPET_DIR = Path("/etc/eigsep/redis")
+REDIS_ROLE_CONF = Path("/etc/redis/redis.conf.d/eigsep-role.conf")
+
+
+def _apply_redis_snippet(
+    role_cfg: RoleConfig,
+    src_dir: Path = REDIS_SNIPPET_DIR,
+    target: Path = REDIS_ROLE_CONF,
+) -> int:
+    """Symlink the role-appropriate Redis persistence snippet and
+    restart Redis.
+
+    The snippets are staged into /etc/eigsep/redis/ at image build
+    time, and the image ships the symlink already pointing at
+    persistent.conf — a redis ``include`` of a missing file is fatal
+    at startup, so unlike the chrony snippet the target must never
+    dangle. The backend Pi gets ephemeral.conf (``save ""`` +
+    ``appendonly no``): its Redis is a live bus co-located with the
+    correlator read loop, and the periodic bgsave fork stalls long
+    enough to drop integrations. Every other role keeps
+    persistent.conf — the panda Pi's Redis is the system of record for
+    one-shot operator state (pico_config, pot_calibration) that
+    nothing republishes on reboot.
+
+    Restart, not reload — Redis only reads its config at startup.
+    Safe at apply-role time: the Pi was just flashed or explicitly
+    re-rolled, so there is no live bus state worth keeping.
+    """
+    is_ephemeral = role_cfg.role == "backend"
+    snippet = src_dir / (
+        "ephemeral.conf" if is_ephemeral else "persistent.conf"
+    )
+    if not snippet.exists():
+        print(
+            f"  warn: {snippet} missing; redis unchanged",
+            file=sys.stderr,
+        )
+        return 1
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if target.is_symlink() or target.exists():
+        target.unlink()
+    target.symlink_to(snippet)
+    rc, msg = systemctl("restart", "redis-server.service")
+    if rc != 0:
+        print(f"  warn: redis restart failed: {msg}", file=sys.stderr)
+        return 1
+    print(f"  redis: {target} -> {snippet}")
+    return 0
+
+
 def _cmd_apply_role(args: argparse.Namespace) -> int:
     """First-boot hook: apply the operator's role conf and self-disable."""
     path = Path(args.role_conf) if args.role_conf else BOOT_ROLE_CONF
@@ -882,6 +932,11 @@ def _cmd_apply_role(args: argparse.Namespace) -> int:
     # timeout — long enough to blow past eigsep-first-boot.service's
     # TimeoutStartSec and SIGTERM the whole apply-role mid-run.
     failed += _apply_chrony_snippet(role_cfg)
+
+    # Re-point the Redis persistence symlink before the role-services
+    # loop so backend services (eigsep-observe and its writer) come up
+    # against the final Redis config instead of racing the restart.
+    failed += _apply_redis_snippet(role_cfg)
 
     for name, entry in targets:
         if entry.get("activation") != "role":
