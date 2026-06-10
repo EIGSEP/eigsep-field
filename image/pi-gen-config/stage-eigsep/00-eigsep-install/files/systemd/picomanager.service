@@ -1,4 +1,4 @@
-# Image-layout copy of picohost/pico-manager.service from the pico-firmware
+# Image-layout copy of picohost/picomanager.service from the pico-firmware
 # repo. Upstream (dev-clone) version uses %h/venv and %h/eigsep/pico-firmware;
 # the field image uses /opt/eigsep/venv and bundles firmware under
 # /opt/eigsep/firmware/pico/. Drift against upstream (After=, Wants=, User=,

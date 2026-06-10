@@ -7,3 +7,9 @@
 # `capture`, and `src` do not require sudo and should NOT be run with it.
 eigsep ALL=(root) NOPASSWD: /usr/local/bin/eigsep-field patch
 eigsep ALL=(root) NOPASSWD: /usr/local/bin/eigsep-field revert
+# flash-picos auto-stops/restarts picomanager around a flash (the
+# manager owns the Pico serial ports). It tries plain systemctl, then
+# `sudo -n systemctl`; these two rules make the fallback passwordless
+# for exactly that unit and nothing else.
+eigsep ALL=(root) NOPASSWD: /usr/bin/systemctl stop --no-ask-password picomanager.service
+eigsep ALL=(root) NOPASSWD: /usr/bin/systemctl start --no-ask-password picomanager.service
