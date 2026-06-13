@@ -120,6 +120,22 @@ version = "9.13.0"
 pypi    = "matplotlib"
 version = "3.10.9"
 
+[debug.pytest]
+# Not just a debug nicety: `eigsep-field verify` shells out to
+# `python -m pytest --pyargs eigsep_observing.contract_tests`, so a
+# wheel-only field image without pytest can't run verify at all.
+pypi    = "pytest"
+version = "9.0.3"
+
+[debug.pyserial-mock]
+# Import name `mockserial`. Backs picohost's dummy devices
+# (picohost.testing), which the contract-test suite imports — needed
+# alongside pytest for `eigsep-field verify`, and lets operators
+# exercise the observing stack against emulated Picos with no hardware
+# attached.
+pypi    = "pyserial-mock"
+version = "1.0.0"
+
 # ---- Field tooling (PyPI, runtime deps of the eigsep-field meta package).
 # Distinct from [debug.*] because these are required for the field
 # workflow itself (`eigsep-field revert` shells out to `uv sync`), not

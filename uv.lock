@@ -213,6 +213,8 @@ dependencies = [
 debug = [
     { name = "ipython" },
     { name = "matplotlib" },
+    { name = "pyserial-mock" },
+    { name = "pytest" },
 ]
 dev = [
     { name = "build" },
@@ -231,6 +233,8 @@ requires-dist = [
     { name = "ipython", marker = "extra == 'debug'", specifier = "==9.13.0" },
     { name = "matplotlib", marker = "extra == 'debug'", specifier = "==3.10.9" },
     { name = "picohost", specifier = "==3.6.0" },
+    { name = "pyserial-mock", marker = "extra == 'debug'", specifier = "==1.0.0" },
+    { name = "pytest", marker = "extra == 'debug'", specifier = "==9.0.3" },
     { name = "pytest", marker = "extra == 'dev'" },
     { name = "pytest-cov", marker = "extra == 'dev'" },
     { name = "pytest-timeout", marker = "extra == 'dev'" },
@@ -911,6 +915,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/1e/7d/ae3f0a63f41e4d2f6cb66a5b57197850f919f59e558159a4dd3a818f5082/pyserial-3.5.tar.gz", hash = "sha256:3c77e014170dfffbd816e6ffc205e9842efb10be9f58ec16d3e8675b4925cddb", size = 159125, upload-time = "2020-11-23T03:59:15.045Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/07/bc/587a445451b253b285629263eb51c2d8e9bcea4fc97826266d186f96f558/pyserial-3.5-py2.py3-none-any.whl", hash = "sha256:c4451db6ba391ca6ca299fb3ec7bae67a5c55dde170964c7a14ceefec02f2cf0", size = 90585, upload-time = "2020-11-23T03:59:13.41Z" },
+]
+
+[[package]]
+name = "pyserial-mock"
+version = "1.0.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/61/6f/e2fea71d236fed88080245bc93b90ac90086d3e629cc94f05b1f1e0361e2/pyserial_mock-1.0.0.tar.gz", hash = "sha256:40676bb94b64422d34ffbc1ba26cf9bbc60f72946669741fcb20f3201d836f65", size = 7451, upload-time = "2026-03-25T17:31:44.795Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d5/ec/eee31654cbf606d4b886136226f36aeba7fa6fc7ac43c0ea8ccb76573815/pyserial_mock-1.0.0-py3-none-any.whl", hash = "sha256:d03c742338e1fa1c824f26f7248ce0aa0eb68ccf8da4e9a8f52faea5a50c6f65", size = 5755, upload-time = "2026-03-25T17:31:43.745Z" },
 ]
 
 [[package]]
