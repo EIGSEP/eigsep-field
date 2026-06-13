@@ -59,10 +59,21 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.13"
-      - name: Install from source (pulls blessed deps from PyPI)
+      - name: Install the blessed tuple from the committed lock
+        # Install against the exported lock (requirements.txt) rather than a
+        # live `pip install .` resolve. The lock pins the full transitive
+        # closure, so `eigsep-field info`'s DRIFT guard below compares
+        # pin-vs-pin and CI can't redden when an unconstrained transitive dep
+        # (e.g. matplotlib via eigsep-vna, which carries no version ceiling)
+        # releases a new version upstream. It's also the install path the
+        # field image actually ships: the wheelhouse is built from this same
+        # lock, not a live resolve — the meta-package is never published to
+        # PyPI. The `manifest` job still confirms every blessed pin exists on
+        # PyPI, so dropping the live resolve loses no real coverage. `-e .`
+        # in requirements.txt installs the eigsep-field console script.
         run: |
           python -m pip install --upgrade pip
-          python -m pip install .
+          python -m pip install -r requirements.txt
       - name: Import every blessed package
         run: |
           python -c "import eigsep_redis, picohost, eigsep_observing, pyvalon; print('imports ok')"
