@@ -55,6 +55,19 @@ writer. It is safe because the field LAN (10.10.10.0/24) is physically
 isolated with no internet uplink. Do **not** copy this config to a Pi
 on a public network without adding `requirepass` first.
 
+Persistence is role-conditional. The image stages two snippets under
+`/etc/eigsep/redis/` and ships
+`/etc/redis/redis.conf.d/eigsep-role.conf` as a symlink to
+`persistent.conf` (stock Debian RDB persistence); at first boot
+`eigsep-field _apply-role` re-points it — `ephemeral.conf`
+(`save ""` + `appendonly no`) on the **backend** Pi, where the bgsave
+fork stalls the co-located correlator read loop and drops
+integrations, and `persistent.conf` everywhere else. The **panda**
+Pi must keep persistence: its Redis is the system of record for
+one-shot operator state (`pico_config` from flash-picos,
+`pot_calibration` from calibrate-pot) that nothing republishes on
+reboot. See the snippet headers for the full rationale.
+
 ## Getting WiFi on a DEV image
 
 DEV images (any non-blessed build — workflow_dispatch, rc-style tag,
