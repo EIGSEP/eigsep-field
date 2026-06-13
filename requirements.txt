@@ -39,7 +39,7 @@ markupsafe==3.0.3
     #   flask
     #   jinja2
     #   werkzeug
-matplotlib==3.10.9
+matplotlib==3.11.0
     # via eigsep-vna
 narwhals==2.20.0
     # via plotly
