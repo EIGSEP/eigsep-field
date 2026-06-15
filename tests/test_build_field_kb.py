@@ -84,3 +84,119 @@ def test_sibling_sources_from_manifest(tmp_path):
     assert names["picohost"].clone_dir == src_root / "pico-firmware"
     assert names["picohost"].package_dir == src_root / "pico-firmware" / "picohost"
     assert names["casperfpga"].clone_dir == src_root / "casperfpga"
+
+
+def _fake_repo(tmp_path):
+    """A minimal eigsep-field-shaped repo + one sibling under src_root."""
+    repo = tmp_path / "eigsep-field"
+    (repo / "docs" / "field-kb" / "anythingllm").mkdir(parents=True)
+    (repo / "docs" / "field-kb" / "topology.md").write_text("# topo\n")
+    (repo / "docs" / "field-kb" / "anythingllm" / "setup.md").write_text("x")
+    (repo / "docs" / "field-kb" / "anythingllm" / "corpus.ignore").write_text(
+        "*.img\n"
+    )
+    (repo / "docs" / "interface").mkdir(parents=True)
+    (repo / "docs" / "interface" / "redis-keys.md").write_text("# keys\n")
+    (repo / "docs" / "operator").mkdir(parents=True)
+    (repo / "docs" / "operator" / "laptop.md").write_text("# laptop\n")
+    (repo / "src").mkdir()
+    (repo / "src" / "ef.py").write_text("# code\n")
+    (repo / "firmware").mkdir()
+    (repo / "firmware" / "loader.py").write_text("# rfsoc\n")
+    (repo / "README.md").write_text("# eigsep-field\n")
+    # a sibling next to the repo
+    sib = tmp_path / "eigsep_redis"
+    (sib / "src").mkdir(parents=True)
+    (sib / "src" / "r.py").write_text("# redis\n")
+    (sib / "big.img").write_text("BLOB")
+    return repo
+
+
+def test_build_assembles_corpus_and_stamp(tmp_path):
+    m = _load_module()
+    repo = _fake_repo(tmp_path)
+    manifest = {
+        "release": "2026.4.0",
+        "packages": {
+            "eigsep_redis": {"source": "https://x", "tag": "v2.3.0"}
+        },
+    }
+    out = tmp_path / "corpus"
+    m.build(
+        manifest=manifest,
+        repo_root=repo,
+        src_root=tmp_path,
+        out_dir=out,
+        patterns=[".git/", "*.img"],
+        build_date="2026-06-15",
+    )
+    # curated KB copied, anythingllm/ config excluded from the corpus
+    assert (out / "kb" / "topology.md").exists()
+    assert not (out / "kb" / "anythingllm" / "setup.md").exists()
+    # ICDs + operator docs copied
+    assert (out / "interface" / "redis-keys.md").exists()
+    assert (out / "operator" / "laptop.md").exists()
+    # this repo's code + firmware copied under repos/eigsep-field
+    assert (out / "repos" / "eigsep-field" / "src" / "ef.py").exists()
+    assert (out / "repos" / "eigsep-field" / "firmware" / "loader.py").exists()
+    # sibling copied, blob excluded
+    assert (out / "repos" / "eigsep_redis" / "src" / "r.py").exists()
+    assert not (out / "repos" / "eigsep_redis" / "big.img").exists()
+    # stamp present and names the release
+    stamp = (out / "CORPUS-MANIFEST.md").read_text()
+    assert "2026.4.0" in stamp
+    assert "2026-06-15" in stamp
+    assert "eigsep_redis" in stamp
+
+
+def test_build_package_path_sibling_pulls_docs_and_readme(tmp_path):
+    m = _load_module()
+    repo = tmp_path / "eigsep-field"
+    (repo / "docs" / "field-kb").mkdir(parents=True)
+    (repo / "docs" / "field-kb" / "topology.md").write_text("# t\n")
+    (repo / "docs" / "interface").mkdir(parents=True)
+    (repo / "docs" / "operator").mkdir(parents=True)
+    # picohost-style sibling: python pkg under a subdir, docs + README at root
+    clone = tmp_path / "pico-firmware"
+    (clone / "picohost").mkdir(parents=True)
+    (clone / "picohost" / "host.py").write_text("# host\n")
+    (clone / "docs").mkdir()
+    (clone / "docs" / "BNO.md").write_text("# datasheet\n")
+    (clone / "README.md").write_text("# pico-firmware\n")
+    manifest = {
+        "release": "2026.4.0",
+        "packages": {
+            "picohost": {
+                "source": "https://x", "tag": "v3.6.0",
+                "clone_path": "pico-firmware", "package_path": "picohost",
+            }
+        },
+    }
+    out = tmp_path / "corpus"
+    m.build(
+        manifest=manifest, repo_root=repo, src_root=tmp_path,
+        out_dir=out, patterns=[".git/"], build_date="2026-06-15",
+    )
+    dest = out / "repos" / "picohost"
+    assert (dest / "host.py").read_text() == "# host\n"      # package_dir
+    assert (dest / "docs" / "BNO.md").exists()                # clone-root docs/
+    assert (dest / "README.md").exists()                      # clone-root README
+
+
+def test_main_runs_end_to_end(tmp_path, monkeypatch):
+    m = _load_module()
+    repo = _fake_repo(tmp_path)
+    monkeypatch.setattr(m, "REPO_ROOT", repo)
+    monkeypatch.setattr(
+        m, "load_manifest",
+        lambda: {"release": "2026.4.0",
+                 "packages": {"eigsep_redis": {"source": "x", "tag": "v2.3.0"}}},
+    )
+    monkeypatch.setattr(
+        m, "IGNORE_FILE",
+        repo / "docs" / "field-kb" / "anythingllm" / "corpus.ignore",
+    )
+    out = tmp_path / "corpus"
+    rc = m.main(["--src-root", str(tmp_path), "--out", str(out)])
+    assert rc == 0
+    assert (out / "CORPUS-MANIFEST.md").exists()

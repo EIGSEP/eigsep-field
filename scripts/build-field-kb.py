@@ -16,11 +16,11 @@ checked out under --src-root (default: the repo's parent directory).
 
 from __future__ import annotations
 
-import argparse  # noqa: F401
-import datetime as dt  # noqa: F401
+import argparse
+import datetime as dt
 import fnmatch
 import shutil
-import subprocess  # noqa: F401
+import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -28,7 +28,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
-from eigsep_field import load_manifest  # noqa: E402,F401
+from eigsep_field import load_manifest  # noqa: E402
 
 
 def read_ignore(path: Path) -> list[str]:
@@ -120,3 +120,127 @@ def sibling_sources(manifest: dict, src_root: Path) -> list[SiblingSource]:
         package_dir = clone_dir / sub if sub else clone_dir
         out.append(SiblingSource(name, clone_dir, package_dir))
     return out
+
+
+IGNORE_FILE = REPO_ROOT / "docs" / "field-kb" / "anythingllm" / "corpus.ignore"
+
+
+def git_commit(path: Path) -> str | None:
+    """Best-effort short commit of a checked-out tree (None if not a repo)."""
+    try:
+        out = subprocess.run(
+            ["git", "-C", str(path), "rev-parse", "--short", "HEAD"],
+            capture_output=True, text=True, check=True,
+        )
+        return out.stdout.strip()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+
+
+def write_stamp(
+    out_dir: Path, manifest: dict, commits: dict[str, str | None],
+    build_date: str,
+) -> None:
+    lines = [
+        "# CORPUS-MANIFEST",
+        "",
+        f"- release: {manifest.get('release', 'unknown')}",
+        f"- built: {build_date}",
+        "",
+        "## Source trees",
+        "",
+        "| repo | commit |",
+        "|------|--------|",
+    ]
+    for name in sorted(commits):
+        lines.append(f"| {name} | {commits[name] or 'unknown'} |")
+    (out_dir / "CORPUS-MANIFEST.md").write_text("\n".join(lines) + "\n")
+
+
+def build(
+    *, manifest: dict, repo_root: Path, src_root: Path, out_dir: Path,
+    patterns: list[str], build_date: str,
+) -> None:
+    """Assemble the corpus folder at out_dir."""
+    # out_dir is regenerated fresh each run — it is wiped first. Pass an
+    # --out you are happy to have replaced (default: out/field-kb-corpus).
+    if out_dir.exists():
+        shutil.rmtree(out_dir)
+    out_dir.mkdir(parents=True)
+
+    # 1. curated KB (minus the anythingllm/ operator config)
+    copy_filtered(
+        repo_root / "docs" / "field-kb",
+        out_dir / "kb",
+        patterns + ["anythingllm/"],
+    )
+    # 2. interface ICDs + operator docs
+    copy_filtered(repo_root / "docs" / "interface", out_dir / "interface", patterns)
+    copy_filtered(repo_root / "docs" / "operator", out_dir / "operator", patterns)
+
+    # 3. this repo's own code/firmware/readme (eigsep-field is in scope)
+    ef = out_dir / "repos" / "eigsep-field"
+    for sub in ("src", "firmware"):
+        if (repo_root / sub).is_dir():
+            copy_filtered(repo_root / sub, ef / sub, patterns)
+    if (repo_root / "README.md").exists():
+        ef.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(repo_root / "README.md", ef / "README.md")
+
+    # 4. blessed field-stack siblings: package dir + docs/ + top-level md/rst
+    commits: dict[str, str | None] = {"eigsep-field": git_commit(repo_root)}
+    for s in sibling_sources(manifest, src_root):
+        if not s.clone_dir.is_dir():
+            print(f"  WARN missing sibling tree: {s.clone_dir}", file=sys.stderr)
+            commits[s.name] = None
+            continue
+        dest = out_dir / "repos" / s.name
+        if s.package_dir.is_dir():
+            copy_filtered(s.package_dir, dest, patterns)
+        # docs/ and top-level READMEs live at the clone root, not under a
+        # package_path subdir — copy them explicitly. For siblings whose
+        # package_dir == clone_dir this is an idempotent re-copy; for
+        # package_path siblings (e.g. picohost) it is load-bearing.
+        if (s.clone_dir / "docs").is_dir():
+            copy_filtered(s.clone_dir / "docs", dest / "docs", patterns)
+        for doc in sorted(s.clone_dir.glob("*.md")) + sorted(
+            s.clone_dir.glob("*.rst")
+        ):
+            dest.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(doc, dest / doc.name)
+        commits[s.name] = git_commit(s.clone_dir)
+
+    # 5. provenance
+    write_stamp(out_dir, manifest, commits, build_date)
+    print(f"corpus written to {out_dir}")
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument(
+        "--src-root", default=str(REPO_ROOT.parent),
+        help="dir holding the sibling checkouts (default: repo parent)",
+    )
+    ap.add_argument(
+        "--out", default=str(REPO_ROOT / "out" / "field-kb-corpus"),
+        help="output corpus directory",
+    )
+    ap.add_argument(
+        "--from-worktree", action="store_true",
+        help="build from local checkouts as-is (default; reserved for "
+             "future SHA-pinned mode)",
+    )
+    args = ap.parse_args(argv)
+    build(
+        manifest=load_manifest(),
+        repo_root=REPO_ROOT,
+        src_root=Path(args.src_root),
+        out_dir=Path(args.out),
+        patterns=read_ignore(IGNORE_FILE),
+        build_date=dt.date.today().isoformat(),
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
