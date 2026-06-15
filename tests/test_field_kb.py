@@ -39,3 +39,18 @@ def test_topology_covers_roles_and_addresses():
     text = (KB / "topology.md").read_text()
     for token in ("panda", "backend", "SNAP", "RFSoC", "10.10.10.10", "DHCP"):
         assert token in text, f"topology.md missing {token}"
+
+
+def test_glossary_defines_core_terms():
+    text = (KB / "glossary.md").read_text()
+    required = [
+        "SNAP", "RFSoC", "CMT-VNA", "Pico", "picohost", "casperfpga",
+        "panda", "backend", "correlator", "chrony", "DHCP", "Valon",
+    ]
+    for term in required:
+        # each term must appear as a definition heading "## <term>"
+        assert f"## {term}" in text or f"## {term} " in text, (
+            f"glossary missing definition heading for {term}"
+        )
+    # an embedder-friendly glossary should be reasonably complete
+    assert text.count("## ") >= 12

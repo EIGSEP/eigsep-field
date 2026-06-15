@@ -353,7 +353,7 @@ One anchored definition per term. Acronyms are spelled out so the agent
 can answer questions that use either form.
 
 ## SNAP
-Smartly-priced Network ADC Processor — the CASPER FPGA board on the
+Smart Network ADC Processor — the CASPER FPGA board on the
 **backend** Pi that digitizes and correlates the antenna signals. The
 backend reads correlator data off it via `casperfpga`.
 
@@ -365,7 +365,7 @@ it a bitstream `.npz` over the network.
 ## CMT-VNA
 The Copper Mountain Technologies Vector Network Analyzer attached to the
 **panda** Pi, driven by `cmtvna.service`. Used for calibration
-measurements. The vendor binary is installed under `/opt/eigsep/cmtvna`.
+measurements. The vendor binary is installed under `/opt/eigsep/cmt-vna`.
 
 ## Pico
 The Raspberry Pi Pico microcontroller(s) on the **panda** Pi, connected
@@ -614,7 +614,7 @@ On the panda Pi:
 `cmtvna.service` fails to start, or calibration can't reach the VNA.
 
 ## Likely causes
-- The CMT VNA binary is not installed at `/opt/eigsep/cmtvna`.
+- The CMT VNA binary is not installed at `/opt/eigsep/cmt-vna`.
 - The VNA is not powered / not enumerated on USB.
 - `cmtvna.service` crashed.
 
@@ -622,7 +622,7 @@ On the panda Pi:
 On the panda Pi:
 
     eigsep-field doctor               # checks the cmtvna install_path/binary
-    ls -l /opt/eigsep/cmtvna
+    ls -l /opt/eigsep/cmt-vna
     lsusb                             # look for the VNA device
     systemctl status cmtvna.service
     journalctl -u cmtvna.service -n 100 --no-pager
