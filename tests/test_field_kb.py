@@ -33,3 +33,9 @@ def test_readme_links_to_core_sections():
         "anythingllm/setup.md",
     ):
         assert target in readme, f"README missing pointer to {target}"
+
+
+def test_topology_covers_roles_and_addresses():
+    text = (KB / "topology.md").read_text()
+    for token in ("panda", "backend", "SNAP", "RFSoC", "10.10.10.10", "DHCP"):
+        assert token in text, f"topology.md missing {token}"
