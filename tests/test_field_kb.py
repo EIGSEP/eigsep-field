@@ -22,3 +22,14 @@ def test_corpus_ignore_excludes_blobs_keeps_docs():
     # But hardware PDFs/docx are shipped on purpose.
     assert "*.pdf" not in patterns
     assert "*.docx" not in patterns
+
+
+def test_readme_links_to_core_sections():
+    readme = (KB / "README.md").read_text()
+    for target in (
+        "topology.md",
+        "glossary.md",
+        "runbooks/",
+        "anythingllm/setup.md",
+    ):
+        assert target in readme, f"README missing pointer to {target}"
