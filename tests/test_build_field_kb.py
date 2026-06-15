@@ -37,3 +37,50 @@ def test_path_is_ignored_matches_dir_and_glob():
     assert m.path_is_ignored("src/eigsep_field.egg-info/SOURCES.txt", pats)
     assert not m.path_is_ignored("src/eigsep/io.py", pats)
     assert not m.path_is_ignored("docs/cmt.pdf", pats)
+
+
+def test_copy_filtered_excludes_ignored(tmp_path):
+    m = _load_module()
+    src = tmp_path / "src"
+    (src / ".git").mkdir(parents=True)
+    (src / ".git" / "x").write_text("nope")
+    (src / "pkg").mkdir()
+    (src / "pkg" / "io.py").write_text("keep")
+    (src / "big.img").write_text("nope")
+    dst = tmp_path / "dst"
+    n = m.copy_filtered(src, dst, [".git/", "*.img"])
+    assert (dst / "pkg" / "io.py").read_text() == "keep"
+    assert not (dst / ".git").exists()
+    assert not (dst / "big.img").exists()
+    assert n == 1
+
+
+def test_sibling_sources_from_manifest(tmp_path):
+    m = _load_module()
+    manifest = {
+        "packages": {
+            "eigsep_redis": {
+                "source": "https://x/eigsep_redis", "tag": "v2.3.0",
+            },
+            "picohost": {
+                "source": "https://x/pico-firmware", "tag": "v3.6.0",
+                "clone_path": "pico-firmware", "package_path": "picohost",
+            },
+        },
+        "hardware": {
+            "casperfpga": {
+                "source": "https://x/casperfpga", "tag": "v0.7.2",
+            },
+            "lgpio": {"version": "0.2.2.0"},  # no source -> skipped
+        },
+    }
+    src_root = tmp_path
+    srcs = m.sibling_sources(manifest, src_root)
+    names = {s.name: s for s in srcs}
+    assert "lgpio" not in names              # PyPI sdist, no tree
+    assert names["eigsep_redis"].clone_dir == src_root / "eigsep_redis"
+    # default branch: package_dir == clone_dir when no package_path set
+    assert names["eigsep_redis"].package_dir == src_root / "eigsep_redis"
+    assert names["picohost"].clone_dir == src_root / "pico-firmware"
+    assert names["picohost"].package_dir == src_root / "pico-firmware" / "picohost"
+    assert names["casperfpga"].clone_dir == src_root / "casperfpga"

@@ -19,9 +19,10 @@ from __future__ import annotations
 import argparse  # noqa: F401
 import datetime as dt  # noqa: F401
 import fnmatch
-import shutil  # noqa: F401
+import shutil
 import subprocess  # noqa: F401
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -61,3 +62,61 @@ def path_is_ignored(relpath: str, patterns: list[str]) -> bool:
         if any(fnmatch.fnmatch(p, pat) for p in parts):
             return True
     return False
+
+
+def copy_filtered(src: Path, dst: Path, patterns: list[str]) -> int:
+    """Copy src/ into dst/, skipping ignored paths. Returns files copied."""
+    count = 0
+    for f in sorted(src.rglob("*")):
+        if not f.is_file():
+            continue
+        rel = f.relative_to(src).as_posix()
+        if path_is_ignored(rel, patterns):
+            continue
+        target = dst / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(f, target)
+        count += 1
+    return count
+
+
+@dataclass(frozen=True)
+class SiblingSource:
+    """A sibling tree to gather into the corpus.
+
+    ``clone_dir`` is the on-disk repo root under --src-root; ``package_dir``
+    is the Python project dir (clone_dir + package_path), used to keep the
+    copy focused on code+docs and avoid vendored SDK/submodule bloat.
+    """
+
+    name: str
+    clone_dir: Path
+    package_dir: Path
+
+
+def sibling_sources(manifest: dict, src_root: Path) -> list[SiblingSource]:
+    """Enumerate git-backed siblings to gather, mirroring the image build.
+
+    Includes every [packages.*] entry and every [hardware.*] entry that
+    has a ``source`` (PyPI-sdist hardware entries like lgpio have no tree
+    and are skipped).
+
+    Assumes the sibling trees are already cloned under ``src_root`` with
+    submodules initialized — this never clones. A missing clone_dir is
+    handled (warned + skipped) by ``build``; an uninitialized submodule
+    would just copy nothing for that subtree.
+    """
+    out: list[SiblingSource] = []
+    entries: list[tuple[str, dict]] = []
+    entries += list(manifest.get("packages", {}).items())
+    entries += [
+        (n, e)
+        for n, e in manifest.get("hardware", {}).items()
+        if "source" in e
+    ]
+    for name, entry in entries:
+        clone_dir = src_root / entry.get("clone_path", name)
+        sub = entry.get("package_path")
+        package_dir = clone_dir / sub if sub else clone_dir
+        out.append(SiblingSource(name, clone_dir, package_dir))
+    return out
