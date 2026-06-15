@@ -1,0 +1,45 @@
+# corpus.ignore — paths excluded when build-field-kb.py assembles the
+# AnythingLLM corpus. One glob per line; '#' comments and blank lines
+# ignored. Matched against the path relative to each copied root and
+# against each path component (so "dir/" excludes that directory
+# anywhere in the tree).
+
+# version control, virtualenvs, caches
+.git/
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+node_modules/
+
+# build artifacts
+build/
+dist/
+*.egg-info/
+*.whl
+wheels/
+
+# vendored SDKs / submodules that bloat the index without operator value
+pico-sdk/
+picotool/
+
+# large binaries / blobs — useless to a text RAG index
+*.img
+*.tar
+*.zip
+*.xz
+*.gz
+*.npz
+*.npy
+*.bin
+*.uf2
+*.so
+*.o
+*.a
+*.elf
+
+# NOTE: pdf and docx files are deliberately NOT excluded — the CMT vendor
+# manuals and the correlator notes are shipped as corpus content.
