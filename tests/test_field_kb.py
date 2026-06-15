@@ -54,3 +54,12 @@ def test_glossary_defines_core_terms():
         )
     # an embedder-friendly glossary should be reasonably complete
     assert text.count("## ") >= 12
+
+
+def test_runbooks_have_required_sections():
+    runbooks = sorted((KB / "runbooks").glob("*.md"))
+    assert len(runbooks) >= 4, "expected at least 4 MVP runbooks"
+    for rb in runbooks:
+        text = rb.read_text()
+        for heading in ("## Symptom", "## Diagnosis", "## Fix"):
+            assert heading in text, f"{rb.name} missing '{heading}'"

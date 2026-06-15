@@ -517,7 +517,7 @@ Run on the backend Pi:
 
     systemctl status eigsep-observe.service eigsep-observe-writer.service
     journalctl -u eigsep-observe.service -n 100 --no-pager
-    systemctl status redis-server
+    systemctl status redis-server.service
     redis-cli ping            # expect: PONG
     ip addr show eth0         # expect inet 10.10.10.10/24
     eigsep-field doctor
@@ -528,7 +528,7 @@ or firmware blob on the backend.
 ## Fix
 - Restart the observing services:
   `sudo systemctl restart eigsep-observe.service eigsep-observe-writer.service`.
-- If `redis-cli ping` fails: `sudo systemctl restart redis-server`.
+- If `redis-cli ping` fails: `sudo systemctl restart redis-server.service`.
 - If `doctor` reports `casperfpga` missing: the image is mis-built;
   reinstall hardware wheels from the wheelhouse (see
   `docs/operator/new-pi.md`).
@@ -562,9 +562,11 @@ On the backend Pi:
     cat /var/lib/dhcp/dhcpd.leases | tail
 
 ## Fix
-- If the role line is wrong: set `role = backend`, then
-  `sudo systemctl restart eigsep-first-boot.service` (or reboot) to
-  re-apply the static IP and enable the role services.
+- If the role line is wrong: set `role = backend`, then re-apply the
+  role. `eigsep-first-boot.service` self-disables after its first run, so
+  a `restart` will NOT re-apply it. Re-enable it and reboot:
+  `sudo systemctl enable eigsep-first-boot.service` then `sudo reboot`.
+  That re-applies the static IP and enables the role services.
 - If the service is down: `sudo systemctl restart isc-dhcp-server.service`.
 - If `eth0` has no/!wrong address: re-apply the role as above; confirm
   the cable is in the correct port and the switch is powered.
