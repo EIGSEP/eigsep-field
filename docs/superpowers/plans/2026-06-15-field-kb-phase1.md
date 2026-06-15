@@ -925,7 +925,8 @@ def path_is_ignored(relpath: str, patterns: list[str]) -> bool:
     parts = Path(relpath).parts
     for pat in patterns:
         if pat.endswith("/"):
-            if pat.rstrip("/") in parts:
+            stripped = pat.rstrip("/")
+            if any(fnmatch.fnmatch(p, stripped) for p in parts):
                 return True
             continue
         if fnmatch.fnmatch(relpath, pat):
