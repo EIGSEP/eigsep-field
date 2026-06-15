@@ -63,3 +63,12 @@ def test_runbooks_have_required_sections():
         text = rb.read_text()
         for heading in ("## Symptom", "## Diagnosis", "## Fix"):
             assert heading in text, f"{rb.name} missing '{heading}'"
+
+
+def test_anythingllm_setup_present():
+    anythingllm = KB / "anythingllm"
+    for name in ("setup.md", "workspace-prompt.md", "bakeoff.md"):
+        assert (anythingllm / name).exists(), f"missing anythingllm/{name}"
+    setup = (anythingllm / "setup.md").read_text()
+    for token in ("ollama", "qwen2.5:7b-instruct", "nomic-embed-text"):
+        assert token in setup, f"setup.md missing {token}"
