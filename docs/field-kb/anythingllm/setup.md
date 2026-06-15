@@ -40,6 +40,14 @@ On a machine with the field-stack siblings checked out next to this repo:
 
     python scripts/build-field-kb.py --out ./out/field-kb-corpus
 
+Each sibling directory must be named to match the manifest path the
+image uses, not the upstream repo name — in particular the CMT-VNA repo
+must be checked out as `eigsep-vna` (its manifest key), so its vendor
+PDFs are gathered. The build prints `WARN missing sibling tree: <path>`
+for any sibling it can't find at the expected name; rename or symlink the
+checkout to clear it. (CI clones siblings to the manifest paths, so the
+release corpus never hits this.)
+
 Copy `out/field-kb-corpus/` to the laptop, then in AnythingLLM:
 - Create a workspace named `eigsep-field`.
 - Upload the corpus folder's files (drag the folder into the workspace's
