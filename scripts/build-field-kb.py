@@ -231,6 +231,11 @@ def main(argv: list[str] | None = None) -> int:
              "future SHA-pinned mode)",
     )
     args = ap.parse_args(argv)
+    # --from-worktree is currently a no-op: the build always reads the
+    # trees as checked out under --src-root. It is parsed now so the flag
+    # exists for when a SHA-pinned default mode lands (Phase 3), at which
+    # point it will select worktree-as-is over the manifest-pinned SHAs.
+    _ = args.from_worktree
     build(
         manifest=load_manifest(),
         repo_root=REPO_ROOT,

@@ -17,7 +17,11 @@ hot-swap in AnythingLLM without rebuilding the corpus.
 9. What is the difference between the panda and backend roles?
 10. How do I revert the Pico to the blessed firmware?
 
-## Scoring (1–5 each: grounded, correct, cites a doc, concise)
+## Scoring
+
+Give each answer one composite 1–5 score (5 = grounded in the corpus,
+correct, cites a doc, and concise). Put the per-question score in the
+cell; use Notes for anything notable.
 
 | Model | Q1 | Q2 | Q3 | Q4 | Q5 | Q6 | Q7 | Q8 | Q9 | Q10 | Notes |
 |-------|----|----|----|----|----|----|----|----|----|-----|-------|
