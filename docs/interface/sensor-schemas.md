@@ -73,6 +73,8 @@ Shared schema object — every listed sensor uses exactly the same fields.
 | `watchdog_tripped` | `bool` | bool → any of non-error survivors |
 | `watchdog_timeout_ms` | `int` | int → min of non-error survivors (expected invariant) |
 | `T_now` | `float` | float → mean of non-error survivors |
+| `voltage` | `float` | float → mean of non-error survivors |
+| `resistance` | `float` | float → mean of non-error survivors |
 | `timestamp` | `float` | float → mean of non-error survivors |
 | `T_target` | `float` | float → mean of non-error survivors |
 | `drive_level` | `float` | float → mean of non-error survivors |
@@ -95,12 +97,8 @@ Shared schema object — every listed sensor uses exactly the same fields.
 | `sensor_name` | `str` | str → first if unanimous, else ``UNKNOWN`` |
 | `status` | `str` | str → first if unanimous, else ``UNKNOWN`` |
 | `app_id` | `int` | int → min of non-error survivors (expected invariant) |
-| `pot_el_voltage` | `float` | float → mean of non-error survivors |
 | `pot_az_voltage` | `float` | float → mean of non-error survivors |
-| `pot_el_angle` | `float` | float → mean of non-error survivors |
 | `pot_az_angle` | `float` | float → mean of non-error survivors |
-| `pot_el_cal_slope` | `float` | float → mean of non-error survivors |
-| `pot_el_cal_intercept` | `float` | float → mean of non-error survivors |
 | `pot_az_cal_slope` | `float` | float → mean of non-error survivors |
 | `pot_az_cal_intercept` | `float` | float → mean of non-error survivors |
 
@@ -133,6 +131,7 @@ Shared schema object — every listed sensor uses exactly the same fields.
 | `sensor_name` | `str` | str → first if unanimous, else ``UNKNOWN`` |
 | `status` | `str` | str → first if unanimous, else ``UNKNOWN`` |
 | `app_id` | `int` | int → min of non-error survivors (expected invariant) |
+| `boot_id` | `int` | int → min of non-error survivors (expected invariant) |
 | `az_pos` | `float` | float → mean of non-error survivors |
 | `az_target_pos` | `float` | float → mean of non-error survivors |
 | `el_pos` | `float` | float → mean of non-error survivors |
