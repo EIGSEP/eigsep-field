@@ -68,9 +68,9 @@ cycler==0.12.1 \
     --hash=sha256:85cef7cff222d8644161529808465972e51340599459b8ac3ccbac5a854e0d30 \
     --hash=sha256:88bb128f02ba341da8ef447245a9e138fae777f6a23943da4540077d3601eb1c
     # via matplotlib
-eigsep-observing==2.5.0 \
-    --hash=sha256:27412196b2142d8649b4028ef0759d83d2a646da4839aebe694dceaa4e2ed225 \
-    --hash=sha256:c1a0c0f0ee223b693c19fc2f95e7f65db949c89843601029b048a4b4471bf692
+eigsep-observing==2.7.0 \
+    --hash=sha256:7e0a9458bf679824f1e6ee46290346017d8145bb088ac395f9c1d64c17fa2f89 \
+    --hash=sha256:b13dfa8463176054d374a7b6bf0a24ca39f56b49e23620818b57f1cca0e0ded1
     # via eigsep-field
 eigsep-redis==2.3.0 \
     --hash=sha256:a3e2ffe5699dc3fe577b0ad9c01fd3e75c705514529931f5cb08c43b599e3538 \
@@ -298,7 +298,9 @@ matplotlib==3.11.0 \
     --hash=sha256:d9695457a467ff86d23f35037a43deb6f1134dd6d3e2ac8ce1e2087cff09ffb9 \
     --hash=sha256:dfabef0230d0697aa0d717385194dd41162e00207a68bf4abf94c2bf4c27dca0 \
     --hash=sha256:e6b3e64dea5062c570f04358e2711859f3531b459f29516274fbad889079e4f3
-    # via eigsep-vna
+    # via
+    #   eigsep-observing
+    #   eigsep-vna
 narwhals==2.20.0 \
     --hash=sha256:16e750ea5507d4ba6e8d03455b5f93a535e0405976561baea235bca5dc9f475d \
     --hash=sha256:c10994975fa7dc5a68c2cffcddbd5908fc8ebb2d463c5bab085309c0ee1f551e
