@@ -7,6 +7,8 @@ click==8.3.3
     # via flask
 colorama==0.4.6 ; sys_platform == 'win32'
     # via click
+colorzero==2.0
+    # via gpiozero
 contourpy==1.3.3
     # via matplotlib
 cycler==0.12.1
@@ -26,6 +28,8 @@ flask==3.1.3
     # via eigsep-observing
 fonttools==4.62.1
     # via matplotlib
+gpiozero==2.0.1
+    # via picohost
 h5py==3.16.0
     # via eigsep-observing
 itsdangerous==2.2.0
@@ -55,7 +59,7 @@ packaging==26.2
     # via
     #   matplotlib
     #   plotly
-picohost==3.6.0
+picohost==3.8.0
     # via
     #   eigsep-field
     #   eigsep-observing
@@ -85,6 +89,8 @@ pyyaml==6.0.3
     # via eigsep-observing
 redis==7.4.0
     # via eigsep-redis
+setuptools==82.0.1
+    # via colorzero
 six==1.17.0
     # via python-dateutil
 typing-extensions==4.15.0
