@@ -290,7 +290,7 @@ role        = "panda"
 source      = "https://github.com/EIGSEP/pico-firmware"
 # Must match [packages.picohost].tag — enforced by check-services-drift.
 tag         = "v3.8.0"
-source_path = "picohost/pico-manager.service"
+source_path = "picohost/picomanager.service"
 
 [services.cmtvna]
 kind        = "sibling"
