@@ -48,6 +48,10 @@ testpaths = ["tests"]
 pythonpath = ["src"]
 addopts = ["--timeout=60"]
 
+[tool.uv]
+# casperfpga declares redis<8; cap the resolver until the fork is updated.
+constraint-dependencies = ["redis<8"]
+
 [tool.ruff]
 line-length = 79
 
