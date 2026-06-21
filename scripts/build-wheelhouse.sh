@@ -114,6 +114,7 @@ uv pip compile \
     --python-platform "$UV_PLATFORM" \
     --generate-hashes \
     --extra debug \
+    --constraint "$(dirname "$0")/wheelhouse-constraints.txt" \
     --output-file "$OUT/requirements.txt" \
     pyproject.toml
 

@@ -1,0 +1,6 @@
+# Extra resolver constraints for build-wheelhouse.sh (passed via --constraint).
+# These are NOT runtime dependencies of eigsep-field — they only cap the
+# transitive resolve to stay compatible with off-PyPI hardware packages.
+#
+# redis<8: casperfpga 0.7.2 declares redis<8. Remove once the fork is updated.
+redis<8
