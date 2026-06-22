@@ -76,7 +76,11 @@ On the laptop:
 ```
 chronyc sources              # at least one public NTP ^*-selected
 sudo ss -ulnp | grep :123    # chronyd listening on UDP/123 on 10.10.10.17
+sudo chronyc clients         # LAN hosts polling the laptop (empty until a Pi boots)
 ```
+
+`chronyc clients` needs root — without `sudo` it returns `501 Not
+authorised`, not an empty table.
 
 On the backend Pi (with the laptop on the LAN):
 
@@ -90,7 +94,7 @@ If `chronyc sources -v` on the Pi shows `10.10.10.17` at stratum 16 or
 Pi falls back to `local stratum 10` against its own (ideally
 coin-cell-backed) RTC. That's the intended fallback, not a bug.
 
-If `chronyc clients` on the laptop stays empty after a Pi has booted,
+If `sudo chronyc clients` on the laptop stays empty after a Pi has booted,
 something on the laptop is blocking UDP/123 inbound on the wired
 interface — check `sudo ufw status` and `sudo nft list ruleset`.
 
