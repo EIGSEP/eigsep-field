@@ -137,6 +137,7 @@ relevant here:
 | `10.10.10.10` | backend Pi (role-pinned static)            |
 | `10.10.10.11` | panda Pi (role-pinned static)              |
 | `10.10.10.12` | active SNAP board (DHCP reservation; both physical units share this address — spare-only, never powered simultaneously) |
+| `10.10.10.13` | RFSoC (standalone non-Pi system; DHCP reservation) |
 
 `.10` is the published entry point. Collaborators reach the system
 there.

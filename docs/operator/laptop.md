@@ -31,6 +31,7 @@ true-UTC ceiling.
 | `10.10.10.10` | backend Pi (published entry; DHCP + NTP server) |
 | `10.10.10.11` | panda Pi                                  |
 | `10.10.10.12` | active SNAP board (spare-only; both units same IP) |
+| `10.10.10.13` | RFSoC (standalone non-Pi system; DHCP reservation) |
 | `10.10.10.17` | operator laptop (any laptop, static)      |
 | `.20`–`.255`  | DHCP dynamic pool                         |
 
