@@ -57,14 +57,9 @@ button is reachable in the field.
       # eigsep-patch.conf retargeting --uf2, restarts the service.
     eigsep-field doctor                   # shows the active drop-in
 
-    flash-picos --uf2 <file.uf2>          # standalone flash; auto-stops and
-                                          # restarts picomanager (--keep-manager
-                                          # to opt out)
-
-WARNING: a field-built UF2 must keep picotool's USB stdio config
-enabled. Without it, the next flash-picos can't trigger BOOTSEL and
-the pico is unrecoverable without physical access. Don't disable
-`PICO_STDIO_USB` or `pico_enable_stdio_usb` in CMakeLists.
+    flash-picos --uf2 <file.uf2>          # standalone flash; flash-only,
+                                          # picomanager keeps running and
+                                          # confirms each board via Redis
 
 ## Revert (the patch was wrong)
 
