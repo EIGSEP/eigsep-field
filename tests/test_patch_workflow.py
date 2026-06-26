@@ -409,18 +409,20 @@ def test_install_editable_targets_package_path(monkeypatch, tmp_path):
 
 @pytest.fixture
 def fake_firmware_env(tmp_path, monkeypatch, manifest):
-    """Stand up a SRC_ROOT + FIRMWARE_ROOT + SYSTEMD_ETC_ROOT layout that
-    matches what the patch/revert flow expects on a real Pi.
+    """Stand up a SRC_ROOT + FIRMWARE_ROOT + venv layout that matches what
+    the patch/revert flow expects on a real Pi.
+
+    Under the pico-firmware #128 model the flow never touches the systemd
+    unit, so no fake unit file is needed; patch-state is tracked by a
+    marker file beside the blessed UF2 under FIRMWARE_ROOT/<kind>/.
     """
     if shutil.which("git") is None:
         pytest.skip("git not available")
     src_root = tmp_path / "src"
     firmware_root = tmp_path / "firmware"
-    systemd_root = tmp_path / "systemd"
     venv = tmp_path / "venv"
     src_root.mkdir()
     (firmware_root / "pico").mkdir(parents=True)
-    systemd_root.mkdir()
     (venv / "bin").mkdir(parents=True)
 
     # The clone, with a fake .git/ dir so the .git existence check passes.
@@ -434,29 +436,19 @@ def fake_firmware_env(tmp_path, monkeypatch, manifest):
     # Blessed UF2 (revert needs it).
     (firmware_root / "pico" / "pico_multi.uf2").write_text("blessed-uf2\n")
 
-    # Pre-existing unit file so _render_drop_in's ExecStart sniffer finds it.
-    (systemd_root / "picomanager.service").write_text(
-        "[Service]\n"
-        "ExecStart=/opt/eigsep/venv/bin/pico-manager "
-        "--config /etc/eigsep/pico_config.json "
-        "--uf2 /opt/eigsep/firmware/pico/pico_multi.uf2\n"
-    )
-
     # Picohost-installed flash-picos. _flash_picos_bin() returns None
     # when neither the venv nor PATH has it, which makes patch/revert
-    # bail before the systemctl stop — see test_*_aborts_when_flash_*.
+    # bail before flashing — see test_*_aborts_when_flash_*.
     fp = venv / "bin" / "flash-picos"
     fp.write_text("#!/bin/sh\nexit 0\n")
     fp.chmod(0o755)
 
     monkeypatch.setattr("eigsep_field._patch.SRC_ROOT", src_root)
     monkeypatch.setattr("eigsep_field._patch.FIRMWARE_ROOT", firmware_root)
-    monkeypatch.setattr("eigsep_field._patch.SYSTEMD_ETC_ROOT", systemd_root)
     monkeypatch.setattr("eigsep_field._patch.VENV_PATH", venv)
     return {
         "src": src_path,
         "firmware": firmware_root,
-        "systemd": systemd_root,
         "venv": venv,
     }
 
@@ -521,7 +513,10 @@ def test_patch_firmware_happy_path(fake_firmware_env, monkeypatch, manifest):
 
     calls, fake_run = _make_run_recorder(fake_firmware_env)
     monkeypatch.setattr(P, "_run", fake_run)
-    monkeypatch.setattr(P, "systemctl", lambda *args: (0, ""))
+    sysctl_calls: list[tuple] = []
+    monkeypatch.setattr(
+        P, "systemctl", lambda *a: sysctl_calls.append(a) or (0, "")
+    )
 
     t = P.resolve_firmware_target(manifest, "pico-firmware")
     rc = P.patch_firmware(t)
@@ -532,18 +527,21 @@ def test_patch_firmware_happy_path(fake_firmware_env, monkeypatch, manifest):
     assert len(build_calls) == 1
     assert build_calls[0][1]["cwd"] == str(fake_firmware_env["src"])
 
-    # flash-picos pointed at the field UF2 (not blessed). Match by
-    # basename: invocation is the absolute venv path on a real Pi.
+    # flash-picos pointed at the field UF2 (not blessed), against the
+    # live manager. Match by basename: invocation is the absolute venv
+    # path on a real Pi.
     flash_calls = [c for c in calls if Path(c[0][0]).name == "flash-picos"]
     assert len(flash_calls) == 1
-    assert flash_calls[0][0][2] == str(t.field_uf2)
+    assert flash_calls[0][0][1:] == ("--uf2", str(t.field_uf2))
 
-    # Drop-in written, referencing the field UF2.
-    assert t.drop_in_path.exists()
-    body = t.drop_in_path.read_text()
-    assert "ExecStart=\nExecStart=" in body
-    assert str(t.field_uf2) in body
-    assert "pico-manager" in body
+    # The picomanager service is never stopped or started — the GPIO
+    # flash is electrical and the live manager confirms via Redis.
+    assert sysctl_calls == []
+
+    # Marker written beside the blessed UF2, referencing the field UF2;
+    # no systemd drop-in is created.
+    assert t.patch_marker.exists()
+    assert str(t.field_uf2) in t.patch_marker.read_text()
     assert P.has_active_firmware_patch(t) is True
 
 
@@ -565,19 +563,19 @@ def test_patch_firmware_build_failure_leaves_service_alone(
     t = P.resolve_firmware_target(manifest, "pico-firmware")
     rc = P.patch_firmware(t)
     assert rc == 2
-    # No flash, no systemctl interactions, no drop-in.
+    # No flash, no systemctl interactions, no marker.
     assert all(Path(c[0][0]).name != "flash-picos" for c in calls)
     assert sysctl_calls == []
-    assert not t.drop_in_path.exists()
+    assert not t.patch_marker.exists()
 
 
 def test_patch_firmware_aborts_when_flash_picos_missing(
     fake_firmware_env, monkeypatch, manifest
 ):
-    """If picohost isn't installed, the patch flow must fail *before*
-    stopping the service. Otherwise subprocess.run raises
-    FileNotFoundError after the stop and bypasses the recovery paths
-    that restart it.
+    """If picohost isn't installed, the patch flow must fail up front —
+    before building or flashing — so the operator gets a clear
+    "is picohost installed?" error instead of a FileNotFoundError
+    raised mid-flow by subprocess.run.
     """
     from eigsep_field import _patch as P
 
@@ -596,9 +594,9 @@ def test_patch_firmware_aborts_when_flash_picos_missing(
     t = P.resolve_firmware_target(manifest, "pico-firmware")
     rc = P.patch_firmware(t)
     assert rc == 2
-    # Bailed before stopping the service.
+    # Bailed before invoking the build script and never touched the
+    # service — pre-flight is up front.
     assert sysctl_calls == []
-    # And before invoking the build script too — pre-flight is up front.
     assert run_calls == []
 
 
@@ -621,7 +619,7 @@ def test_revert_firmware_aborts_when_flash_picos_missing(
     assert sysctl_calls == []
 
 
-def test_patch_firmware_flash_failure_restarts_service_without_dropin(
+def test_patch_firmware_flash_failure_returns_rc_without_marker(
     fake_firmware_env, monkeypatch, manifest
 ):
     from eigsep_field import _patch as P
@@ -639,21 +637,21 @@ def test_patch_firmware_flash_failure_restarts_service_without_dropin(
     t = P.resolve_firmware_target(manifest, "pico-firmware")
     rc = P.patch_firmware(t)
     assert rc == 3
-    # Service was stopped before flash, then started after flash fail.
-    assert ("stop", t.service_unit) in sysctl_calls
-    assert ("start", t.service_unit) in sysctl_calls
-    assert not t.drop_in_path.exists()
+    # The manager was never stopped, so there is nothing to restart; the
+    # marker is not written since the flash didn't take.
+    assert sysctl_calls == []
+    assert not t.patch_marker.exists()
 
 
-def test_revert_firmware_removes_dropin_and_reflashes_blessed(
+def test_revert_firmware_removes_marker_and_reflashes_blessed(
     fake_firmware_env, monkeypatch, manifest
 ):
     from eigsep_field import _patch as P
 
-    # Stand up an active patch first.
+    # Stand up an active patch first (marker present).
     t = P.resolve_firmware_target(manifest, "pico-firmware")
-    t.drop_in_path.parent.mkdir(parents=True, exist_ok=True)
-    t.drop_in_path.write_text("# stale override\n")
+    t.patch_marker.parent.mkdir(parents=True, exist_ok=True)
+    t.patch_marker.write_text("field_uf2 = /some/field.uf2\n")
 
     calls: list[tuple[tuple[str, ...], dict]] = []
 
@@ -662,17 +660,22 @@ def test_revert_firmware_removes_dropin_and_reflashes_blessed(
         return 0
 
     monkeypatch.setattr(P, "_run", fake_run)
-    monkeypatch.setattr(P, "systemctl", lambda *args: (0, ""))
+    sysctl_calls: list[tuple] = []
+    monkeypatch.setattr(
+        P, "systemctl", lambda *a: sysctl_calls.append(a) or (0, "")
+    )
 
     rc = P.revert_firmware(t)
     assert rc == 0
-    assert not t.drop_in_path.exists()
+    assert not t.patch_marker.exists()
+    # Reflashed blessed against the live manager; never stopped it.
     flash = [c for c in calls if Path(c[0][0]).name == "flash-picos"]
     assert len(flash) == 1
-    assert flash[0][0][2] == str(t.blessed_uf2)
+    assert flash[0][0][1:] == ("--uf2", str(t.blessed_uf2))
+    assert sysctl_calls == []
 
 
-def test_revert_firmware_idempotent_when_no_dropin(
+def test_revert_firmware_idempotent_when_no_marker(
     fake_firmware_env, monkeypatch, manifest
 ):
     """revert with no prior patch still reflashes blessed (safe to retry)."""
@@ -691,48 +694,25 @@ def test_revert_firmware_idempotent_when_no_dropin(
     assert len(flash) == 1
 
 
-def test_swap_uf2_path_basic():
-    from eigsep_field._patch import _swap_uf2_path
-
-    out = _swap_uf2_path(
-        "/opt/eigsep/venv/bin/pico-manager --config /etc/x.json "
-        "--uf2 /opt/eigsep/firmware/pico/pico_multi.uf2",
-        Path("/opt/eigsep/src/pico-firmware/build/pico_multi.uf2"),
-    )
-    assert (
-        out == "/opt/eigsep/venv/bin/pico-manager --config /etc/x.json "
-        "--uf2 /opt/eigsep/src/pico-firmware/build/pico_multi.uf2"
-    )
+# ----- Doctor surfaces active firmware patch marker -----
 
 
-def test_swap_uf2_path_no_uf2_flag_falls_back():
-    """Fallback when the unit file ExecStart is missing or has no --uf2."""
-    from eigsep_field._patch import _swap_uf2_path
-
-    out = _swap_uf2_path("", Path("/some/field.uf2"))
-    assert out.startswith("/opt/eigsep/venv/bin/pico-manager")
-    assert "--uf2 /some/field.uf2" in out
-
-
-# ----- Doctor surfaces drop-in override -----
-
-
-def test_doctor_firmware_patch_note_when_dropin_present(
+def test_doctor_firmware_patch_note_when_marker_present(
     fake_firmware_env, manifest
 ):
     from eigsep_field._patch import resolve_firmware_target
     from eigsep_field.cli import _check_firmware_patches
 
     t = resolve_firmware_target(manifest, "pico-firmware")
-    t.drop_in_path.parent.mkdir(parents=True, exist_ok=True)
-    t.drop_in_path.write_text("[Service]\nExecStart=\nExecStart=foo\n")
+    t.patch_marker.parent.mkdir(parents=True, exist_ok=True)
+    t.patch_marker.write_text("field_uf2 = /opt/eigsep/src/.../field.uf2\n")
 
     notes = _check_firmware_patches(manifest)
     assert any("field-patched UF2 active" in n for n in notes)
     assert any("pico-firmware" in n for n in notes)
 
 
-def test_doctor_firmware_patch_silent_without_dropin(
+def test_doctor_firmware_patch_silent_without_marker(
     fake_firmware_env, manifest
 ):
     from eigsep_field.cli import _check_firmware_patches

@@ -372,12 +372,12 @@ def _check_editable_drift(manifest: dict) -> list[str]:
 
 
 def _check_firmware_patches(manifest: dict) -> list[str]:
-    """Surface active firmware drop-in overrides as advisory notes.
+    """Surface an active field firmware patch as an advisory note.
 
     When the operator has run ``eigsep-field patch pico-firmware``, a
-    drop-in retargets the unit's --uf2 flag at the field-built UF2.
-    This must be operator-visible from a cold ssh so a stale hotfix
-    doesn't haunt the next campaign.
+    marker file records that a field-built UF2 is flashed onto the
+    pico(s). This must be operator-visible from a cold ssh so a stale
+    hotfix doesn't haunt the next campaign.
     """
     notes: list[str] = []
     for t in all_firmware_targets(manifest):

@@ -52,10 +52,11 @@ button is reachable in the field.
     vim src/...                          # edit .c
     git commit -am "field fix: <one-liner>"
     sudo eigsep-field patch pico-firmware
-      # builds build/pico_multi.uf2, stops picomanager, flash-picos's
-      # the new UF2, writes /etc/systemd/system/picomanager.service.d/
-      # eigsep-patch.conf retargeting --uf2, restarts the service.
-    eigsep-field doctor                   # shows the active drop-in
+      # builds build/pico_multi.uf2, then flash-picos's the new UF2
+      # against the LIVE picomanager (it self-discovers and confirms the
+      # boards over Redis; the service is never stopped). Writes a marker
+      # file beside the blessed UF2 so doctor can flag the field firmware.
+    eigsep-field doctor                   # flags the active field UF2
 
     flash-picos --uf2 <file.uf2>          # standalone flash; flash-only,
                                           # picomanager keeps running and
@@ -64,7 +65,7 @@ button is reachable in the field.
 ## Revert (the patch was wrong)
 
     sudo eigsep-field revert eigsep_observing      # one sibling
-    sudo eigsep-field revert pico-firmware         # drop override + reflash blessed
+    sudo eigsep-field revert pico-firmware         # clear marker + reflash blessed
     sudo eigsep-field revert --all                 # everything back to blessed
 
 ## Capture (send the fix back to base)

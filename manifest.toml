@@ -171,10 +171,13 @@ roles   = ["panda"]
 # operator-visible name is the src_path (matches the repo name and the
 # clone destination from [packages.picohost].clone_path). The blessed
 # UF2 above is never overwritten — a field build lands at
-# /opt/eigsep/src/<src_path>/<artifact> and a systemd drop-in retargets
-# the service's --uf2 flag at it, so the path itself signals "this is
-# not blessed". `eigsep-field revert pico-firmware` drops the override
-# and flash-picos's the blessed UF2 back.
+# /opt/eigsep/src/<src_path>/<artifact> and `flash-picos` flashes it
+# onto the Pico(s) against the live picomanager (which self-discovers
+# and confirms the boards over Redis — the service is never stopped). A
+# marker file beside the blessed UF2 records that a field UF2 is active;
+# `eigsep-field revert pico-firmware` clears it and flash-picos's the
+# blessed UF2 back. `service` below is informational (doctor reports it);
+# the patch flow no longer modifies the unit.
 src_path = "pico-firmware"
 script   = "build.sh"
 artifact = "build/pico_multi.uf2"

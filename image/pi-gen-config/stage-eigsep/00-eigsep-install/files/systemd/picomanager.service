@@ -1,8 +1,10 @@
 # Image-layout copy of picohost/picomanager.service from the pico-firmware
 # repo. Upstream (dev-clone) version uses %h/venv and %h/eigsep/pico-firmware;
-# the field image uses /opt/eigsep/venv and bundles firmware under
-# /opt/eigsep/firmware/pico/. Drift against upstream (After=, Wants=, User=,
-# Restart=, ExecStart argv[0]) is enforced by scripts/check-services-drift.py.
+# the field image uses /opt/eigsep/venv and /opt/eigsep. pico-manager takes
+# no --uf2: it self-discovers boards (flashing is flash-picos's job), so the
+# ExecStart matches upstream's flag-free invocation. Drift against upstream
+# (After=, Wants=, User=, Restart=, ExecStart argv[0]) is enforced by
+# scripts/check-services-drift.py.
 [Unit]
 Description=EIGSEP Pico Manager
 After=redis-server.service
@@ -11,7 +13,7 @@ PartOf=eigsep-panda.target
 
 [Service]
 Environment=PYTHONUNBUFFERED=1
-ExecStart=/opt/eigsep/venv/bin/pico-manager --uf2 /opt/eigsep/firmware/pico/pico_multi.uf2
+ExecStart=/opt/eigsep/venv/bin/pico-manager
 Restart=always
 RestartSec=5
 TimeoutStartSec=120
