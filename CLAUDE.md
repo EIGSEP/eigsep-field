@@ -191,12 +191,17 @@ Required keys:
 - `script` — build script relative to `src_path`. Run from there.
 - `artifact` — UF2 path relative to `src_path` (e.g.
   `build/pico_multi.uf2`).
-- `service` — systemd unit whose `--uf2` flag is retargeted via a
-  drop-in at `/etc/systemd/system/<unit>.d/eigsep-patch.conf`.
+- `service` — systemd unit that runs the firmware. Informational only
+  (`doctor` reports it); the patch flow does **not** modify the unit.
+  `picomanager` self-discovers boards over Redis, so `patch`/`revert`
+  flash against the **live** service without stopping it.
 
 The blessed UF2 at `/opt/eigsep/firmware/<kind>/<asset>` is **never**
-overwritten — the field UF2 is identified by path, and `revert` deletes
-the drop-in and reflashes blessed.
+overwritten — a field build lands at its own path and `flash-picos`
+flashes it onto the device. `patch` records a marker file
+(`.field-patch`) beside the blessed UF2 so `doctor` /
+`has_active_firmware_patch` can flag the active field firmware; `revert`
+clears the marker and reflashes blessed.
 
 To add a new on-image-buildable firmware target: add `[firmware.<kind>.build]`,
 clone the source repo via a `[packages.*]` or `[hardware.*]` entry

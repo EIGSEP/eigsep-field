@@ -27,9 +27,11 @@ sudo eigsep-field patch pico-firmware
 ```
 
 This builds from the cloned source at `/opt/eigsep/src/pico-firmware/`
-and retargets `picomanager.service` at the field UF2 via a systemd
-drop-in. `eigsep-field revert pico-firmware` drops the override and
-reflashes the blessed UF2.
+and flashes the field UF2 onto the Pico(s) against the live
+`picomanager` (it self-discovers and confirms the boards over Redis;
+the service is never stopped). A marker file beside the blessed UF2
+records that a field UF2 is active. `eigsep-field revert pico-firmware`
+clears the marker and reflashes the blessed UF2.
 
 ## Source
 
