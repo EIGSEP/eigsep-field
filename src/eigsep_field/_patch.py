@@ -301,15 +301,6 @@ def patch_firmware(target: FirmwareTarget) -> int:
         print(f"  FAIL start: {msg}", file=sys.stderr)
         return rc
     print(f"  started {target.service_unit} (running field UF2)")
-    print()
-    print(
-        "  WARNING: field UF2 must keep picotool's USB stdio config "
-        "enabled,\n"
-        "  otherwise the next `flash-picos` cannot trigger BOOTSEL and "
-        "the\n"
-        "  device becomes unrecoverable without physical SD/button "
-        "access."
-    )
     return 0
 
 
