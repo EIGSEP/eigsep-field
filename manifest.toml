@@ -49,8 +49,8 @@ sha256  = ""
 
 [packages.eigsep_observing]
 pypi    = "eigsep_observing"
-version = "2.7.0"
-tag     = "v2.7.0"
+version = "2.8.0"
+tag     = "v2.8.0"
 source  = "https://github.com/EIGSEP/eigsep_observing"
 sha256  = ""
 
@@ -316,7 +316,7 @@ activation  = "role"
 role        = "backend"
 source      = "https://github.com/EIGSEP/eigsep_observing"
 # Must match [packages.eigsep_observing].tag — enforced by check-services-drift.
-tag         = "v2.7.0"
+tag         = "v2.8.0"
 source_path = "deploy/systemd/eigsep-observe.service"
 
 [services.eigsep_observe_writer]
@@ -329,7 +329,7 @@ activation  = "role"
 role        = "backend"
 source      = "https://github.com/EIGSEP/eigsep_observing"
 # Must match [packages.eigsep_observing].tag — enforced by check-services-drift.
-tag         = "v2.7.0"
+tag         = "v2.8.0"
 source_path = "deploy/systemd/eigsep-observe-writer.service"
 
 [services.eigsep_panda_target]
