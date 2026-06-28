@@ -124,6 +124,16 @@ Shared schema object — every listed sensor uses exactly the same fields.
 | `distance_m` | `float` | float → mean of non-error survivors |
 
 
+### `system_current`
+
+| Field | Type | Reduction |
+|---|---|---|
+| `sensor_name` | `str` | str → first if unanimous, else ``UNKNOWN`` |
+| `status` | `str` | str → first if unanimous, else ``UNKNOWN`` |
+| `current_voltage` | `float` | float → mean of non-error survivors |
+| `current_a` | `float` | float → mean of non-error survivors |
+
+
 ### `motor`
 
 | Field | Type | Reduction |
