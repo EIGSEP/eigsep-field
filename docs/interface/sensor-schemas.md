@@ -44,9 +44,7 @@ The tables below are regenerated from live imports of `eigsep_observing.io` by
 
 <!-- BEGIN GENERATED: sensor-schemas -->
 <!-- Do not edit by hand. Regenerate with ./scripts/gen_interface_docs.py -->
-### `imu_el`, `imu_az`
-
-Shared schema object — every listed sensor uses exactly the same fields.
+### `imu_el`
 
 | Field | Type | Reduction |
 |---|---|---|
@@ -59,6 +57,27 @@ Shared schema object — every listed sensor uses exactly the same fields.
 | `accel_x` | `float` | float → mean of non-error survivors |
 | `accel_y` | `float` | float → mean of non-error survivors |
 | `accel_z` | `float` | float → mean of non-error survivors |
+| `el_deg` | `float` | float → mean of non-error survivors |
+
+
+### `imu_az`
+
+| Field | Type | Reduction |
+|---|---|---|
+| `sensor_name` | `str` | str → first if unanimous, else ``UNKNOWN`` |
+| `status` | `str` | str → first if unanimous, else ``UNKNOWN`` |
+| `app_id` | `int` | int → min of non-error survivors (expected invariant) |
+| `yaw` | `float` | float → mean of non-error survivors |
+| `pitch` | `float` | float → mean of non-error survivors |
+| `roll` | `float` | float → mean of non-error survivors |
+| `accel_x` | `float` | float → mean of non-error survivors |
+| `accel_y` | `float` | float → mean of non-error survivors |
+| `accel_z` | `float` | float → mean of non-error survivors |
+| `el_deg` | `float` | float → mean of non-error survivors |
+| `az_deg` | `float` | float → mean of non-error survivors |
+| `az_from_accel_deg` | `float` | float → mean of non-error survivors |
+| `az_from_yaw_deg` | `float` | float → mean of non-error survivors |
+| `az_blend_weight` | `float` | float → mean of non-error survivors |
 
 
 ### `tempctrl_lna`, `tempctrl_load`
@@ -132,6 +151,8 @@ Shared schema object — every listed sensor uses exactly the same fields.
 | `status` | `str` | str → first if unanimous, else ``UNKNOWN`` |
 | `current_voltage` | `float` | float → mean of non-error survivors |
 | `current_a` | `float` | float → mean of non-error survivors |
+| `current_cal_slope` | `float` | float → mean of non-error survivors |
+| `current_cal_intercept` | `float` | float → mean of non-error survivors |
 
 
 ### `motor`
