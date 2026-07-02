@@ -31,6 +31,7 @@ permalink below.
 | `cmtvna`                 | [CMT-VNA / scripts/cmtvna.service](https://github.com/EIGSEP/CMT-VNA/blob/v1.3.0/scripts/cmtvna.service)                         |
 | `eigsep_observe`         | [eigsep_observing / deploy/systemd/eigsep-observe.service](https://github.com/EIGSEP/eigsep_observing/blob/v2.0.0/deploy/systemd/eigsep-observe.service) |
 | `eigsep_observe_writer`  | [eigsep_observing / deploy/systemd/eigsep-observe-writer.service](https://github.com/EIGSEP/eigsep_observing/blob/v2.0.0/deploy/systemd/eigsep-observe-writer.service) |
+| `eigsep_host_health`     | [eigsep_observing / deploy/systemd/eigsep-host-health.service](https://github.com/EIGSEP/eigsep_observing/blob/v2.9.0/deploy/systemd/eigsep-host-health.service) |
 
 `redis-server` and `isc-dhcp-server` are apt-provided (no unit file
 shipped here). The role targets (`eigsep-panda.target`,
