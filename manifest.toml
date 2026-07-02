@@ -369,6 +369,23 @@ source      = "https://github.com/EIGSEP/eigsep_observing"
 tag         = "v2.9.0"
 source_path = "deploy/systemd/eigsep-observe-writer.service"
 
+[services.eigsep_host_health]
+# Pi vitals publisher: SoC temperature → the Pi's LOCAL Redis every
+# 10 s, surfaced as the "Backend pi" / "Panda pi" tiles on the
+# live-status dashboard. The identical unit runs on both Pis (it
+# publishes to localhost; the dashboard maps host by transport), so
+# unlike the observe units it is not role-scoped — activation="always"
+# enables it at image build on every Pi, and it keeps upstream's
+# WantedBy=multi-user.target instead of a role-target wrap. A
+# role-less bring-up Pi publishing its own temperature is harmless.
+kind        = "sibling"
+unit        = "eigsep-host-health.service"
+activation  = "always"
+source      = "https://github.com/EIGSEP/eigsep_observing"
+# Must match [packages.eigsep_observing].tag — enforced by check-services-drift.
+tag         = "v2.9.0"
+source_path = "deploy/systemd/eigsep-host-health.service"
+
 [services.eigsep_panda_target]
 kind       = "local"
 unit       = "eigsep-panda.target"
