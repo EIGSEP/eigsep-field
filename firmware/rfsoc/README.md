@@ -1,5 +1,9 @@
 # firmware/rfsoc/
 
+Operator runbook (field sequence, troubleshooting):
+[`docs/operator/rfsoc.md`](../../docs/operator/rfsoc.md). This page
+covers where the artifacts come from and why.
+
 RFSoC firmware + waveform artifacts. The blobs themselves are not
 committed — they come from `eigsep_dac` GitHub Releases, pinned by
 `[firmware.rfsoc]` in the top-level `manifest.toml` (the per-directory
