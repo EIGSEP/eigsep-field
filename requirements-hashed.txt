@@ -68,9 +68,9 @@ cycler==0.12.1 \
     --hash=sha256:85cef7cff222d8644161529808465972e51340599459b8ac3ccbac5a854e0d30 \
     --hash=sha256:88bb128f02ba341da8ef447245a9e138fae777f6a23943da4540077d3601eb1c
     # via matplotlib
-eigsep-observing==2.8.0 \
-    --hash=sha256:250fdec38ced98cfc9d553648d7953462cb724095fc53f48a2b33751c282ddc4 \
-    --hash=sha256:da1d612a7be42671ba2d04e47439d2799efb559b75241eb524b24dc6698fb778
+eigsep-observing==2.9.0 \
+    --hash=sha256:3aaa888a30a875d3012619b9b7f516f549709de5cdca236ee769733c9f2dc33f \
+    --hash=sha256:f7adb38301c9729b8038c48ea290cbfa0f259c35144e5e21f554ed7ae9a5b4b1
     # via eigsep-field
 eigsep-redis==2.3.0 \
     --hash=sha256:a3e2ffe5699dc3fe577b0ad9c01fd3e75c705514529931f5cb08c43b599e3538 \
@@ -362,9 +362,9 @@ packaging==26.2 \
     # via
     #   matplotlib
     #   plotly
-picohost==3.9.0 \
-    --hash=sha256:2164dcefaec3cafc6d96d48e68e87349970751f19219d701be9ddf78999cb4df \
-    --hash=sha256:ad5a8baeeab01557b851c53ada4ba2fead92fdb3df4ca495cc6b59412aa7d7b0
+picohost==3.11.0 \
+    --hash=sha256:193ce7d1c7134336ac388408ace6bb29910a54c7fc2f1f7ab3096ec6296f740d \
+    --hash=sha256:3313b4690337bfc147b4862c4150db92d8961449395a9df8a5ad1320deac5be9
     # via
     #   eigsep-field
     #   eigsep-observing
