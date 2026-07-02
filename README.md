@@ -81,6 +81,10 @@ services all run on the Pis with no laptop required. See
 list of capabilities the operator laptop should provide for full
 field ops.
 
+Programming the RFSoC transmitter (it boots into single-DAC output;
+both-DAC needs a post-boot step):
+[`docs/operator/rfsoc.md`](docs/operator/rfsoc.md).
+
 ## Release / bump workflow
 
 1. Open a `release-coordination` issue.
