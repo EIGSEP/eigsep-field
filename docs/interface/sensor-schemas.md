@@ -99,8 +99,9 @@ Shared schema object — every listed sensor uses exactly the same fields.
 | `drive_level` | `float` | float → mean of non-error survivors |
 | `enabled` | `bool` | bool → any of non-error survivors |
 | `active` | `bool` | bool → any of non-error survivors |
-| `int_disabled` | `bool` | bool → any of non-error survivors |
+| `sensor_tripped` | `bool` | bool → any of non-error survivors |
 | `stall_tripped` | `bool` | bool → any of non-error survivors |
+| `runaway_tripped` | `bool` | bool → any of non-error survivors |
 | `cooling_enabled` | `bool` | bool → any of non-error survivors |
 | `hysteresis` | `float` | float → mean of non-error survivors |
 | `clamp` | `float` | float → mean of non-error survivors |
@@ -120,6 +121,7 @@ Shared schema object — every listed sensor uses exactly the same fields.
 | `pot_az_angle` | `float` | float → mean of non-error survivors |
 | `pot_az_cal_slope` | `float` | float → mean of non-error survivors |
 | `pot_az_cal_intercept` | `float` | float → mean of non-error survivors |
+| `pot_az_near_rail` | `bool` | bool → any of non-error survivors |
 
 
 ### `rfswitch`
@@ -131,6 +133,20 @@ Shared schema object — every listed sensor uses exactly the same fields.
 | `app_id` | `int` | int → min of non-error survivors (expected invariant) |
 | `sw_state` | `int` | int → min of non-error survivors (expected invariant) |
 | `sw_state_name` | `str` | str → first if unanimous, else ``UNKNOWN`` |
+
+
+### `rfswitch_therm`
+
+| Field | Type | Reduction |
+|---|---|---|
+| `sensor_name` | `str` | str → first if unanimous, else ``UNKNOWN`` |
+| `status` | `str` | str → first if unanimous, else ``UNKNOWN`` |
+| `volt_therm0` | `float` | float → mean of non-error survivors |
+| `volt_therm1` | `float` | float → mean of non-error survivors |
+| `volt_therm2` | `float` | float → mean of non-error survivors |
+| `temp_therm0` | `float` | float → mean of non-error survivors |
+| `temp_therm1` | `float` | float → mean of non-error survivors |
+| `temp_therm2` | `float` | float → mean of non-error survivors |
 
 
 ### `lidar`
