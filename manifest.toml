@@ -16,16 +16,16 @@ notes        = "docs/releases/2026.4.0.md"
 
 [packages.eigsep_redis]
 pypi    = "eigsep_redis"
-version = "2.3.0"
-tag     = "v2.3.0"
+version = "2.3.1"
+tag     = "v2.3.1"
 source  = "https://github.com/EIGSEP/eigsep_redis"
 # sha256 of the sdist on PyPI; populated by scripts/refresh-lock.sh
 sha256  = ""
 
 [packages.picohost]
 pypi    = "picohost"
-version = "3.11.0"
-tag     = "v3.11.0"
+version = "4.1.0"
+tag     = "v4.1.0"
 source  = "https://github.com/EIGSEP/pico-firmware"
 sha256  = ""
 # The pico-firmware repo carries both the Python wrapper (picohost/)
@@ -49,8 +49,8 @@ sha256  = ""
 
 [packages.eigsep_observing]
 pypi    = "eigsep_observing"
-version = "2.9.0"
-tag     = "v2.9.0"
+version = "2.10.0"
+tag     = "v2.10.0"
 source  = "https://github.com/EIGSEP/eigsep_observing"
 sha256  = ""
 
@@ -185,10 +185,10 @@ version = "0.10.4"
 # pico-firmware's release-please.yml job that attaches it to the tagged
 # Release. Stable across releases; provenance is enforced by sha256 below.
 # Loaded by picomanager.service which only runs on the panda Pi.
-version = "v3.11.0"
+version = "v4.1.0"
 asset   = "pico_multi.uf2"
 source  = "https://github.com/EIGSEP/pico-firmware"
-tag     = "v3.11.0"
+tag     = "v4.1.0"
 sha256  = ""
 roles   = ["panda"]
 
@@ -329,7 +329,7 @@ activation  = "role"
 role        = "panda"
 source      = "https://github.com/EIGSEP/pico-firmware"
 # Must match [packages.picohost].tag — enforced by check-services-drift.
-tag         = "v3.11.0"
+tag         = "v4.1.0"
 source_path = "picohost/picomanager.service"
 
 [services.cmtvna]
@@ -353,7 +353,7 @@ activation  = "role"
 role        = "backend"
 source      = "https://github.com/EIGSEP/eigsep_observing"
 # Must match [packages.eigsep_observing].tag — enforced by check-services-drift.
-tag         = "v2.9.0"
+tag         = "v2.10.0"
 source_path = "deploy/systemd/eigsep-observe.service"
 
 [services.eigsep_observe_writer]
@@ -366,7 +366,7 @@ activation  = "role"
 role        = "backend"
 source      = "https://github.com/EIGSEP/eigsep_observing"
 # Must match [packages.eigsep_observing].tag — enforced by check-services-drift.
-tag         = "v2.9.0"
+tag         = "v2.10.0"
 source_path = "deploy/systemd/eigsep-observe-writer.service"
 
 [services.eigsep_host_health]
@@ -383,7 +383,7 @@ unit        = "eigsep-host-health.service"
 activation  = "always"
 source      = "https://github.com/EIGSEP/eigsep_observing"
 # Must match [packages.eigsep_observing].tag — enforced by check-services-drift.
-tag         = "v2.9.0"
+tag         = "v2.10.0"
 source_path = "deploy/systemd/eigsep-host-health.service"
 
 [services.eigsep_panda_target]
