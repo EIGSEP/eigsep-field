@@ -115,9 +115,9 @@ change required.
 
 4. **Service control helper** (new small module, e.g.
    `vna_service.py`): `start()` / `stop()` shell out to
-   `systemctl start|stop cmtvna.service`. Runs locally (constraint #3),
-   authorized by the polkit rule below — no `sudo`. Non-zero exit
-   surfaces as a clear error via `_error_with_status`.
+   `systemctl start|stop cmtvna.service`, with a `sudo -n` fallback
+   authorized by the sudoers drop-in below. Runs locally (constraint #3).
+   Non-zero exit surfaces as a clear error via `_error_with_status`.
 
 5. **Readiness probe** `_wait_vna_ready(timeout=30s)`: after start, poll
    by opening a throwaway pyvisa socket and querying `*IDN?` with a short
@@ -173,21 +173,21 @@ change required.
    healthy when **present and not failed**, regardless of active/enabled —
    so a stopped `cmtvna.service` is reported "present (on-demand)" and
    never a red failure.
-6. **Polkit rule**, delivered by the image (drop a file in
-   `/etc/polkit-1/rules.d/`, staged like the other image files):
-   ```javascript
-   // 49-eigsep-cmtvna.rules — let 'eigsep' manage only cmtvna.service
-   polkit.addRule(function(action, subject) {
-     if (action.id == "org.freedesktop.systemd1.manage-units" &&
-         action.lookup("unit") == "cmtvna.service" &&
-         subject.user == "eigsep") {
-       return polkit.Result.YES;
-     }
-   });
+6. **Sudoers drop-in** (revised from the original polkit plan). The image
+   already ships `files/sudoers.d/eigsep-field`, which grants the `eigsep`
+   user passwordless `systemctl start/stop --no-ask-password
+   picomanager.service` (used by flash-picos). Follow that established
+   pattern — add two analogous lines for `cmtvna.service` rather than
+   introducing a parallel polkit mechanism:
    ```
-   Lets the panda_observe process `systemctl start/stop cmtvna.service`
-   passwordless without a `sudo` shell-out. (Fallback: a scoped
-   `NOPASSWD` sudoers line if Trixie's polkit build misbehaves.)
+   eigsep ALL=(root) NOPASSWD: /usr/bin/systemctl stop --no-ask-password cmtvna.service
+   eigsep ALL=(root) NOPASSWD: /usr/bin/systemctl start --no-ask-password cmtvna.service
+   ```
+   The observe-side `vna_service` module mirrors flash-picos: try plain
+   `systemctl`, then `sudo -n systemctl … --no-ask-password`. (The
+   original polkit `.rules` approach remains a viable alternative if the
+   team prefers no `sudo` shell-out; it was dropped only because the
+   sudoers precedent already exists.)
 7. **Docs:** update `docs/operator/` panda runbook (the service is now
    operator/observe-managed, not always-on) and the CLAUDE.md
    "adding a systemd service" section to document the `on-demand`
@@ -224,7 +224,7 @@ change required.
 - **eigsep-field (unit):** `activation="on-demand"` is skipped by
   `_apply-role` and `enable-always`; doctor reports a stopped on-demand
   unit as healthy; drift check stays green after the target/manifest
-  edits; polkit rule file is staged into the image tree.
+  edits; the cmtvna sudoers lines are present in the staged drop-in.
 - **On-Pi manual:** cold-start timing; a full `vna_loop` iteration brings
   the service up then down; CPU/temp return to baseline between
   measurements; a burst (position sweep) keeps it up for one window.
@@ -261,7 +261,7 @@ change required.
 3. Land eigsep_observing behind the session (VNA still constructed each
    session) with the service left always-on — verify sessions work while
    the service is up.
-4. Flip eigsep-field to `on-demand` + polkit; verify end-to-end on the
+4. Flip eigsep-field to `on-demand` + sudoers; verify end-to-end on the
    panda.
 
 ## Risks & open questions
@@ -271,8 +271,9 @@ change required.
 - **Host-locality assumption** (constraint #3): if `PandaClient` ever
   runs off-panda, local `systemctl` breaks. Add an in-code comment; a
   future fix would route start/stop through Redis like the RF switch.
-- **Polkit on Trixie:** confirm the `.rules` (JS) format is honored by
-  the image's polkit build; fall back to scoped sudoers if not.
+- **Privilege mechanism:** resolved to a sudoers drop-in (mirrors the
+  existing picomanager start/stop rules) rather than a new polkit rule.
+  See eigsep-field slice item 6.
 - **fd leak:** building a fresh `VNA` per session must close the previous
   pyvisa resource — covered by the session `finally`, but verify no
   socket leak across many iterations in the on-Pi test.
