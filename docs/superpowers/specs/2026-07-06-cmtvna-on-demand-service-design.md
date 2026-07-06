@@ -119,13 +119,14 @@ change required.
    authorized by the polkit rule below — no `sudo`. Non-zero exit
    surfaces as a clear error via `_error_with_status`.
 
-5. **Readiness probe** `_wait_vna_ready(timeout≈60s)`: after start, poll
+5. **Readiness probe** `_wait_vna_ready(timeout=30s)`: after start, poll
    by opening a throwaway pyvisa socket and querying `*IDN?` with a short
    per-attempt timeout + backoff, until it returns the R60 id or the cap
    is hit. TCP-accept alone is insufficient — the server accepts before
    the instrument is ready. On timeout: raise, stop the service, surface
-   via status. (The 60s cap is a starting value; **tune from the measured
-   cold-start** — see de-risk step 2.)
+   via status. Cold-start measured at a **consistent ~5.5s** on the panda
+   (de-risk step 2); the 30s cap is ~5× headroom for a cold/loaded Pi or a
+   USB re-enumeration hiccup.
 
 6. **Call-site wraps** — the session wraps **outside** `switch_section`
    so the ~seconds of warm-up don't hold the RF-switch lock:
@@ -232,6 +233,7 @@ change required.
 
 1. On the panda: `sudo systemctl stop cmtvna` and watch `htop` — confirm
    CPU/temp drop and nothing else wedges. Validates the whole premise.
+   **Done 2026-07-06: CPU and temp both drop significantly.**
 2. **Measure the cold start on the panda** (`systemctl start cmtvna` →
    first successful `*IDN?`) to set the readiness timeout. In the observe
    venv on the panda:
@@ -254,7 +256,8 @@ change required.
    PY
    ```
    Run it a few times; set the readiness cap to a comfortable margin over
-   the worst observed (e.g. 3–4×).
+   the worst observed (e.g. 3–4×). **Done 2026-07-06: consistent ~5.5s →
+   readiness cap set to 30s.**
 3. Land eigsep_observing behind the session (VNA still constructed each
    session) with the service left always-on — verify sessions work while
    the service is up.
@@ -263,8 +266,8 @@ change required.
 
 ## Risks & open questions
 
-- **Cold-start latency** adds seconds of delay to the first measurement
-  in a window. Acceptable for hourly/burst cadence; quantify in step 2.
+- **Cold-start latency** adds ~5.5s (measured, consistent) to the first
+  measurement in a window. Negligible for hourly/burst cadence.
 - **Host-locality assumption** (constraint #3): if `PandaClient` ever
   runs off-panda, local `systemctl` breaks. Add an in-code comment; a
   future fix would route start/stop through Redis like the RF switch.
