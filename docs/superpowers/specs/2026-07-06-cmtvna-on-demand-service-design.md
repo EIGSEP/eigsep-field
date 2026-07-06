@@ -90,30 +90,44 @@ change required.
    `__init__` (the `_switch` wiring, heartbeat, RFANT force-safe) is
    independent of the VNA and stays.
 
-2. **`PandaClient.vna_session()` context manager:**
-   - **enter:** `_start_cmtvna()` → wait-until-ready → `self.init_VNA()`.
-   - **yield.**
-   - **exit (always, even on exception):** close the pyvisa resource
-     (`self.vna.s.close()`), set `self.vna = None`, `_stop_cmtvna()`.
-   - Re-entrant guard: nested `vna_session()` calls share the outer
-     session (refcount) so a burst script that opens a session and calls
-     helpers which also open one don't stop the service early.
+2. **Explicit `vna_open()` / `vna_close()` pair** — the primitive both the
+   context manager and interactive REPL use:
+   - `vna_open()`: `_start_cmtvna()` → wait-until-ready → `self.init_VNA()`.
+   - `vna_close()`: close the pyvisa resource (`self.vna.s.close()`), set
+     `self.vna = None`, `_stop_cmtvna()`.
+   - Re-entrant via a refcount/depth counter: `vna_open()` starts the
+     service on 0→1, `vna_close()` stops it on 1→0. So nested opens (a
+     burst script that opens a session and calls a helper that also opens
+     one) don't stop the service early, and an ad-hoc REPL user can call
+     `vna_open()`/`vna_close()` directly.
 
-3. **Service control helper** (new small module, e.g.
+3. **`PandaClient.vna_session()` context manager** — thin wrapper over the
+   pair so scripts get exception-safe teardown:
+   ```python
+   @contextmanager
+   def vna_session(self):
+       self.vna_open()
+       try:
+           yield
+       finally:
+           self.vna_close()
+   ```
+
+4. **Service control helper** (new small module, e.g.
    `vna_service.py`): `start()` / `stop()` shell out to
    `systemctl start|stop cmtvna.service`. Runs locally (constraint #3),
    authorized by the polkit rule below — no `sudo`. Non-zero exit
    surfaces as a clear error via `_error_with_status`.
 
-4. **Readiness probe** `_wait_vna_ready(timeout≈60s)`: after start, poll
+5. **Readiness probe** `_wait_vna_ready(timeout≈60s)`: after start, poll
    by opening a throwaway pyvisa socket and querying `*IDN?` with a short
    per-attempt timeout + backoff, until it returns the R60 id or the cap
    is hit. TCP-accept alone is insufficient — the server accepts before
    the instrument is ready. On timeout: raise, stop the service, surface
-   via status. (The 60s cap is a starting value; tune from the measured
-   cold-start in the de-risk step.)
+   via status. (The 60s cap is a starting value; **tune from the measured
+   cold-start** — see de-risk step 2.)
 
-5. **Call-site wraps** — the session wraps **outside** `switch_section`
+6. **Call-site wraps** — the session wraps **outside** `switch_section`
    so the ~seconds of warm-up don't hold the RF-switch lock:
    - `vna_loop`: wrap the **body of the while loop** (session → switch
      section → ant+rec), so the service is down during the long
@@ -121,14 +135,20 @@ change required.
    - `run_calibration_sequence`: wrap its VNA block.
    - `scripts/vna_position_sweep.py`: **one** session around the whole
      grid loop (the burst stays warm).
-   - `scripts/vna_manual.py`: one session around the interactive block.
+   - `scripts/vna_manual.py`: **one** session around the whole `_repl`
+     loop (build_vna_subsystem, line 191) so the operator measures freely
+     from the menu without typing anything session-related; service stops
+     when they quit the REPL.
    - `build_vna_subsystem` (vna.py:147): move the `VNA(...)` + `setup()`
-     into a session-managed lifecycle so bring-up scripts inherit it.
+     into the session lifecycle (`vna_open`/`vna_close`) so bring-up
+     scripts inherit it rather than constructing the VNA eagerly.
 
-6. **Outside-session guard.** `measure_s11` / `PandaClient.measure_s11`
-   raise a clear, actionable error if `self.vna is None` (i.e. called
-   with no open session) rather than silently auto-starting — keeps the
-   cold-start cost intentional and visible. Message names `vna_session()`.
+7. **Outside-session guard.** `measure_s11` / `PandaClient.measure_s11`
+   raise a clear, actionable error if `self.vna is None` (i.e. called with
+   no open session) rather than silently auto-starting — keeps the
+   cold-start cost intentional and visible. Message names both
+   `vna_session()` and `vna_open()` so REPL and script users each see the
+   entry point they'd use.
 
 ### `eigsep-field` (this repo)
 
@@ -194,10 +214,12 @@ change required.
 
 - **eigsep_observing (unit):** `DummyVNA` + a fake service-control
   (record start/stop calls) to assert: session enter starts before
-  connect and exit stops after close; nested sessions refcount; an
-  exception mid-measure still stops the service; `measure_s11` outside a
-  session raises. Readiness probe: fake `*IDN?` failing N times then
-  succeeding.
+  connect and exit stops after close; nested opens refcount (service
+  starts once, stops once at the depth boundary); balanced
+  `vna_open`/`vna_close`; an exception mid-measure still stops the
+  service; `measure_s11` outside a session raises with a message naming
+  `vna_open`/`vna_session`. Readiness probe: fake `*IDN?` failing N times
+  then succeeding, and timing out cleanly (service stopped) past the cap.
 - **eigsep-field (unit):** `activation="on-demand"` is skipped by
   `_apply-role` and `enable-always`; doctor reports a stopped on-demand
   unit as healthy; drift check stays green after the target/manifest
@@ -210,8 +232,29 @@ change required.
 
 1. On the panda: `sudo systemctl stop cmtvna` and watch `htop` — confirm
    CPU/temp drop and nothing else wedges. Validates the whole premise.
-2. Time a cold start (`systemctl start cmtvna` → first successful
-   `*IDN?`) to set the readiness timeout.
+2. **Measure the cold start on the panda** (`systemctl start cmtvna` →
+   first successful `*IDN?`) to set the readiness timeout. In the observe
+   venv on the panda:
+   ```bash
+   sudo systemctl stop cmtvna; sleep 2
+   python3 - <<'PY'
+   import time, subprocess, pyvisa
+   t0 = time.time()
+   subprocess.run(["sudo","systemctl","start","cmtvna"], check=True)
+   rm = pyvisa.ResourceManager("@py")
+   idn = None
+   while time.time() - t0 < 120:
+       try:
+           s = rm.open_resource("TCPIP::127.0.0.1::5025::SOCKET")
+           s.read_termination = "\n"; s.timeout = 2000
+           idn = s.query("*IDN?\n"); break
+       except Exception:
+           time.sleep(0.5)
+   print(f"ready in {time.time()-t0:.1f}s -> {idn!r}")
+   PY
+   ```
+   Run it a few times; set the readiness cap to a comfortable margin over
+   the worst observed (e.g. 3–4×).
 3. Land eigsep_observing behind the session (VNA still constructed each
    session) with the service left always-on — verify sessions work while
    the service is up.
