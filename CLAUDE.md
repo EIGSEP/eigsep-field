@@ -228,11 +228,18 @@ uniform across Pis; per-Pi differentiation is the role set in
      this repo), or `"sibling"` (owned by a sibling repo, tracked for
      drift).
    - `unit` — the systemd unit filename.
-   - `activation` — `"always"` (enabled on every Pi at build time) or
+   - `activation` — `"always"` (enabled on every Pi at build time),
      `"role"` (enabled on first boot when `/boot/firmware/eigsep-role.conf`
-     matches).
-   - `role` — required when `activation = "role"`. One of `"panda"` or
-     `"backend"`.
+     matches), or `"on-demand"` (installed but never enabled by the image
+     or first boot; the owning process starts/stops it around use — e.g.
+     `cmtvna.service`, which the observe-side `vna_service` module brings
+     up only around an S11 sweep because the CMT binary busy-loops the
+     CPU). On-demand services still take `role` (for `eigsep-field
+     services` control + doctor visibility) but must NOT be added to the
+     role `.target`'s `Wants=`, and need a sudoers line if a non-root
+     process starts them.
+   - `role` — required when `activation = "role"` or `"on-demand"`. One of
+     `"panda"` or `"backend"`.
    - `source` / `tag` / `source_path` — required for `kind = "sibling"`;
      tag must match the corresponding `[packages.*].tag`.
 2. For `kind = "local"` or `kind = "sibling"`, drop the unit file (adapted
