@@ -296,7 +296,7 @@ def test_wheelhouse_swap_and_pip(ctx, tmp_path, monkeypatch):
     assert (wh.parent / "previous-release").read_text() == "2026.3.0"
     pip = str(_sync.VENV_PATH / "bin" / "pip")
     assert any(c[:2] == [pip, "install"] and "-r" in c for c in runs)
-    assert any(str(ctx.tree) in c for c in runs)  # tree reinstall
+    assert [pip, "install", "--quiet", str(ctx.tree)] in runs
 
 
 def test_wheelhouse_sha_mismatch_keeps_old(ctx, tmp_path, monkeypatch):
