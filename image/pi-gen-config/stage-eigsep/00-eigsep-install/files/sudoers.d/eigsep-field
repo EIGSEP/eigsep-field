@@ -13,3 +13,10 @@ eigsep ALL=(root) NOPASSWD: /usr/local/bin/eigsep-field revert
 # for exactly that unit and nothing else.
 eigsep ALL=(root) NOPASSWD: /usr/bin/systemctl stop --no-ask-password picomanager.service
 eigsep ALL=(root) NOPASSWD: /usr/bin/systemctl start --no-ask-password picomanager.service
+# cmtvna.service is on-demand (the CMT R60 binary busy-loops the CPU):
+# panda_observe / vna_manual start it around an S11 window and stop it
+# after. The eigsep_observing vna_service module tries plain systemctl
+# then `sudo -n`; these rules make the fallback passwordless for exactly
+# this unit and nothing else.
+eigsep ALL=(root) NOPASSWD: /usr/bin/systemctl stop --no-ask-password cmtvna.service
+eigsep ALL=(root) NOPASSWD: /usr/bin/systemctl start --no-ask-password cmtvna.service

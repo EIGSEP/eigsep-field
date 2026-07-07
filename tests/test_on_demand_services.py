@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from eigsep_field import cli
 from eigsep_field._services import RoleConfig, services_for_role
 
@@ -105,3 +107,22 @@ def test_apply_role_does_not_enable_on_demand(monkeypatch, tmp_path):
     # picomanager (role) is enabled; cmtvna (on-demand) is NOT.
     assert ("enable", "--now", "picomanager.service") in seen
     assert not any("cmtvna.service" in c for c in seen)
+
+
+SUDOERS = (
+    Path(__file__).resolve().parents[1]
+    / "image/pi-gen-config/stage-eigsep/00-eigsep-install/files"
+    / "sudoers.d/eigsep-field"
+)
+
+
+def test_sudoers_allows_cmtvna_start_stop():
+    text = SUDOERS.read_text()
+    assert (
+        "NOPASSWD: /usr/bin/systemctl start --no-ask-password "
+        "cmtvna.service" in text
+    )
+    assert (
+        "NOPASSWD: /usr/bin/systemctl stop --no-ask-password "
+        "cmtvna.service" in text
+    )
