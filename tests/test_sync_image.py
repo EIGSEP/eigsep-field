@@ -333,3 +333,98 @@ def test_wheelhouse_404_warns_and_skips(ctx, tmp_path, monkeypatch):
     _sync.step_wheelhouse(ctx)
     assert ctx.failures == 0  # mid-cycle: warn, not fail
     assert _sync.wheelhouse_pin(wh) == "2026.3.0"
+
+
+@pytest.fixture
+def panda_ctx(ctx):
+    role = ctx.dest("/etc/eigsep/role")
+    role.parent.mkdir(parents=True, exist_ok=True)
+    role.write_text("role = panda\n")
+    ctx.manifest["firmware"] = {
+        "pico": {
+            "asset": "pico_multi.uf2",
+            "source": "https://github.com/EIGSEP/pico-firmware",
+            "tag": "v4.1.0",
+            "sha256": "",
+            "roles": ["panda"],
+        },
+        "rfsoc": {
+            "asset": "rfsoc_2026.tar.gz",
+            "source": "https://github.com/EIGSEP/eigsep_dac",
+            "tag": "v0.3.0",
+            "sha256": "",
+            "roles": ["backend"],
+        },
+    }
+    return ctx
+
+
+def test_firmware_downloads_missing_blob(panda_ctx, monkeypatch):
+    got = []
+
+    def fake_download(url, dest):
+        got.append(url)
+        dest.write_bytes(b"UF2")
+
+    monkeypatch.setattr(_sync, "_download", fake_download)
+    _sync.step_firmware(panda_ctx)
+    blessed = panda_ctx.dest("/opt/eigsep/firmware/pico/pico_multi.uf2")
+    assert blessed.read_bytes() == b"UF2"
+    assert got == [
+        "https://github.com/EIGSEP/pico-firmware"
+        "/releases/download/v4.1.0/pico_multi.uf2"
+    ]  # rfsoc is backend-only: not fetched on panda
+
+
+def test_firmware_present_no_pin_is_kept(panda_ctx, monkeypatch):
+    blessed = panda_ctx.dest("/opt/eigsep/firmware/pico/pico_multi.uf2")
+    blessed.parent.mkdir(parents=True)
+    blessed.write_bytes(b"OLD")
+    monkeypatch.setattr(
+        _sync,
+        "_download",
+        lambda *a: pytest.fail("must not download"),
+    )
+    _sync.step_firmware(panda_ctx)
+    assert blessed.read_bytes() == b"OLD"
+
+
+def test_firmware_sha_mismatch_refetches(panda_ctx, monkeypatch):
+    import hashlib as h
+
+    panda_ctx.manifest["firmware"]["pico"]["sha256"] = h.sha256(
+        b"NEW"
+    ).hexdigest()
+    blessed = panda_ctx.dest("/opt/eigsep/firmware/pico/pico_multi.uf2")
+    blessed.parent.mkdir(parents=True)
+    blessed.write_bytes(b"OLD")
+    monkeypatch.setattr(
+        _sync, "_download", lambda url, dest: dest.write_bytes(b"NEW")
+    )
+    _sync.step_firmware(panda_ctx)
+    assert blessed.read_bytes() == b"NEW"
+
+
+def test_external_installs_when_binary_missing(panda_ctx, monkeypatch):
+    panda_ctx.manifest["external"] = {
+        "cmtvna": {
+            "install_path": "/opt/eigsep/cmt-vna",
+            "binary": "bin/cmtvna",
+            "roles": ["panda"],
+        }
+    }
+    script = panda_ctx.tree / "scripts" / "install-cmtvna.sh"
+    script.parent.mkdir(parents=True, exist_ok=True)
+    script.write_text("#!/bin/bash\n")
+    runs = []
+    monkeypatch.setattr(
+        _sync,
+        "_run",
+        lambda cmd, **kw: (
+            runs.append(cmd),
+            subprocess.CompletedProcess(cmd, 0),
+        )[1],
+    )
+    _sync.step_external(panda_ctx)
+    assert runs and runs[0][0] == "bash"
+    assert runs[0][1].endswith("install-cmtvna.sh")

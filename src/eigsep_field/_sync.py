@@ -14,6 +14,7 @@ docs/superpowers/specs/2026-07-07-sync-image-design.md
 from __future__ import annotations
 
 import hashlib
+import os
 import re
 import shutil
 import subprocess
@@ -27,7 +28,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from eigsep_field._patch import VENV_PATH, WHEELHOUSE
-from eigsep_field._services import systemctl  # noqa: F401 (later steps)
+from eigsep_field._services import (
+    entry_for_role,
+    parse_role_file,
+    systemctl,
+)  # noqa: F401 (later steps)
 
 STAGE_REL = "image/pi-gen-config/stage-eigsep/00-eigsep-install"
 
@@ -449,3 +454,78 @@ def step_removals(ctx: SyncContext) -> None:
         else:
             target.unlink()
         ctx.note(f"removed {target}")
+
+
+def sync_role(ctx: SyncContext) -> str | None:
+    return parse_role_file(ctx.dest("/etc/eigsep/role")).role
+
+
+def step_firmware(ctx: SyncContext) -> None:
+    """Refresh blessed firmware blobs. Never flashes hardware."""
+    role = sync_role(ctx)
+    for kind, entry in ctx.manifest.get("firmware", {}).items():
+        asset = entry.get("asset")
+        if not asset:
+            continue
+        if not entry_for_role(entry, role):
+            ctx.note(f"firmware {kind}: skipped (role {role})")
+            continue
+        blessed = ctx.dest(f"/opt/eigsep/firmware/{kind}/{asset}")
+        want = entry.get("sha256", "")
+        if blessed.exists() and (not want or _sha256(blessed) == want):
+            ctx.note(f"firmware {kind}: {asset} up to date")
+            continue
+        url = f"{entry['source']}/releases/download/{entry['tag']}/{asset}"
+        if ctx.dry_run:
+            ctx.note(f"would download {url}")
+            continue
+        tmp = blessed.parent / (asset + ".sync-tmp")
+        blessed.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            _download(url, tmp)
+        except (urllib.error.HTTPError, urllib.error.URLError) as e:
+            ctx.fail(f"firmware {kind}: download {url}: {e}")
+            continue
+        if want and _sha256(tmp) != want:
+            ctx.fail(f"firmware {kind}: sha256 mismatch; keeping old")
+            tmp.unlink()
+            continue
+        tmp.replace(blessed)
+        ctx.note(
+            f"firmware {kind}: updated {asset} — flash with "
+            "flash-picos / `eigsep-field revert pico-firmware`"
+            if kind == "pico"
+            else f"firmware {kind}: updated {asset}"
+        )
+        if (blessed.parent / ".field-patch").exists():
+            ctx.note(
+                f"firmware {kind}: NOTE a field patch is active; "
+                "blessed blob updated but not flashed"
+            )
+
+
+def step_external(ctx: SyncContext) -> None:
+    """Install missing [external.*] binaries via their scripts."""
+    role = sync_role(ctx)
+    for name, entry in ctx.manifest.get("external", {}).items():
+        if not entry_for_role(entry, role):
+            ctx.note(f"external {name}: skipped (role {role})")
+            continue
+        binary = ctx.dest(str(Path(entry["install_path"]) / entry["binary"]))
+        if binary.exists() and os.access(binary, os.X_OK):
+            ctx.note(f"external {name}: present")
+            continue
+        script = ctx.tree / "scripts" / f"install-{name}.sh"
+        if not script.exists():
+            ctx.fail(f"external {name}: {script} missing")
+            continue
+        if ctx.dry_run:
+            ctx.note(f"would run {script} (URL fetch)")
+            continue
+        env = dict(os.environ)
+        env["EIGSEP_MANIFEST"] = str(ctx.tree / "manifest.toml")
+        r = _run(["bash", str(script)], env=env)
+        if r.returncode != 0:
+            ctx.fail(f"external {name}: install script failed")
+        else:
+            ctx.note(f"external {name}: installed")
