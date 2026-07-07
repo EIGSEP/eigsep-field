@@ -1,0 +1,40 @@
+# apt packages installed into the image chroot AND re-applied in place
+# by `eigsep-field sync-image`. One package per line. Full-line
+# comments only — no inline comments (both consumers strip only lines
+# starting with '#').
+python3
+python3-venv
+python3-pip
+redis-server
+isc-dhcp-server
+chrony
+picotool
+xvfb
+libegl1
+libopengl0
+libfontconfig1
+libxkbcommon0
+libxkbcommon-x11-0
+libxcb-cursor0
+libxcb-icccm4
+libxcb-keysyms1
+libxcb-shape0
+libxcb-xkb1
+git
+curl
+vim-nox
+screen
+arp-scan
+tcpdump
+tshark
+nmap
+mtr-tiny
+traceroute
+iputils-arping
+dnsutils
+build-essential
+pkg-config
+libusb-1.0-0-dev
+cmake
+gcc-arm-none-eabi
+libstdc++-arm-none-eabi-newlib
