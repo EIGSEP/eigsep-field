@@ -323,13 +323,20 @@ def _check_services(
     for name, entry in services.items():
         unit = entry["unit"]
         activation = entry.get("activation")
-        tag = (
-            "always"
-            if activation == "always"
-            else f"role: {entry.get('role', '?')}"
-        )
+        if activation == "always":
+            tag = "always"
+        elif activation == "on-demand":
+            tag = "on-demand"
+        else:
+            tag = f"role: {entry.get('role', '?')}"
         if name not in expected:
             ok.append(f"{unit} skipped (not this role — {tag})")
+            continue
+        if activation == "on-demand":
+            # Started only by the owning process (panda_observe /
+            # vna_manual) around a measurement window; a stopped unit is
+            # the normal, healthy state, so do not health-gate it.
+            ok.append(f"{unit} on-demand (operator/observe-managed)")
             continue
         healthy, state = unit_health(unit)
         if healthy:
@@ -432,11 +439,12 @@ def _cmd_services(args: argparse.Namespace) -> int:
         for name, entry in services.items():
             unit = entry["unit"]
             activation = entry.get("activation", "?")
-            scope = (
-                "always"
-                if activation == "always"
-                else f"role: {entry.get('role', '?')}"
-            )
+            if activation == "always":
+                scope = "always"
+            elif activation == "on-demand":
+                scope = "on-demand"
+            else:
+                scope = f"role: {entry.get('role', '?')}"
             if name in expected:
                 state = (
                     f"{'active' if is_active(unit) else 'inactive'}/"
