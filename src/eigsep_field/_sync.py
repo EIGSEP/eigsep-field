@@ -553,7 +553,7 @@ def step_sources(ctx: SyncContext) -> None:
             ctx.note(f"would clone {t.name} ({t.tag})")
     elif missing:
         ns = argparse.Namespace(src_root=str(SRC_ROOT), user="eigsep")
-        if _image_install._cmd_clone_sources(ns):
+        if _image_install._cmd_clone_sources(ns, manifest=ctx.manifest):
             ctx.fail("clone-sources reported failures")
     for t in targets:
         repo = SRC_ROOT / t.clone_path
@@ -561,7 +561,15 @@ def step_sources(ctx: SyncContext) -> None:
             continue
         kw = _git_kwargs(repo)
         if not ctx.dry_run:
-            _run(["git", "-C", str(repo), "fetch", "--tags", "-q"], **kw)
+            fetch = _run(
+                ["git", "-C", str(repo), "fetch", "--tags", "-q"], **kw
+            )
+            if fetch.returncode != 0:
+                ctx.note(
+                    f"warn: {t.name}: git fetch failed "
+                    f"({fetch.stderr.strip() or 'network?'}); "
+                    "using local refs"
+                )
         r = _run(["git", "-C", str(repo), "rev-list", "-n1", t.tag], **kw)
         if r.returncode != 0:
             ctx.fail(f"sources {t.name}: cannot resolve {t.tag}")

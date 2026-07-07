@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import shutil
 import subprocess
 import tarfile
 from pathlib import Path
@@ -488,3 +489,81 @@ def test_sources_refreshes_blessed_marker(ctx, tmp_path, monkeypatch):
         check=True,
     ).stdout.strip()
     assert marker == v2
+
+
+def test_sources_warns_on_fetch_failure(ctx, tmp_path, monkeypatch, capsys):
+    # upstream repo with one tag, already resolvable locally
+    upstream = tmp_path / "upstream"
+    upstream.mkdir()
+    _git("init", "-q", cwd=upstream)
+    (upstream / "f").write_text("1")
+    _git("add", "f", cwd=upstream)
+    _git("commit", "-qm", "one", cwd=upstream)
+    _git("tag", "v1.0.0", cwd=upstream)
+
+    src_root = tmp_path / "src"
+    src_root.mkdir()
+    subprocess.run(
+        ["git", "clone", "-q", "-b", "v1.0.0", str(upstream), "demo"],
+        cwd=src_root,
+        check=True,
+        capture_output=True,
+    )
+    v1 = subprocess.run(
+        ["git", "rev-list", "-n1", "v1.0.0"],
+        cwd=upstream,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    old = "0" * 40
+    (src_root / "demo" / ".eigsep-blessed-commit").write_text(old + "\n")
+    monkeypatch.setattr(_sync, "SRC_ROOT", src_root)
+    ctx.manifest["packages"] = {
+        "demo": {
+            "source": str(upstream),
+            "tag": "v1.0.0",
+            "version": "1.0.0",
+        }
+    }
+
+    # kill upstream so `git fetch` in the clone can't reach it
+    shutil.rmtree(upstream)
+
+    _sync.step_sources(ctx)
+
+    marker = (src_root / "demo" / ".eigsep-blessed-commit").read_text().strip()
+    assert ctx.failures == 0
+    assert marker == v1
+    out = capsys.readouterr().out
+    assert "warn" in out
+    assert "fetch failed" in out
+
+
+def test_sources_clone_uses_tree_manifest(ctx, tmp_path, monkeypatch):
+    src_root = tmp_path / "src"
+    src_root.mkdir()
+    monkeypatch.setattr(_sync, "SRC_ROOT", src_root)
+    ctx.manifest["packages"] = {
+        "demo": {
+            "source": "https://example.invalid/demo.git",
+            "tag": "v1.0.0",
+            "version": "1.0.0",
+        }
+    }
+
+    from eigsep_field import _image_install
+
+    calls = []
+
+    def fake_clone_sources(args, manifest=None):
+        calls.append(manifest)
+        return 0
+
+    monkeypatch.setattr(
+        _image_install, "_cmd_clone_sources", fake_clone_sources
+    )
+
+    _sync.step_sources(ctx)
+
+    assert calls == [ctx.manifest]

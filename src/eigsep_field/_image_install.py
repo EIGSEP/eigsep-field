@@ -101,8 +101,10 @@ def _clone_targets(manifest: dict) -> list[CloneTarget]:
     return targets
 
 
-def _cmd_clone_sources(args: argparse.Namespace) -> int:
-    manifest = load_manifest()
+def _cmd_clone_sources(
+    args: argparse.Namespace, manifest: dict | None = None
+) -> int:
+    manifest = manifest if manifest is not None else load_manifest()
     src_root = Path(args.src_root)
     src_root.mkdir(parents=True, exist_ok=True)
 
