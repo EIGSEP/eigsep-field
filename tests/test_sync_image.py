@@ -567,3 +567,73 @@ def test_sources_clone_uses_tree_manifest(ctx, tmp_path, monkeypatch):
     _sync.step_sources(ctx)
 
     assert calls == [ctx.manifest]
+
+
+def test_read_apt_packages_skips_comments(tree):
+    f = _sync.files_dir(tree) / "apt-packages.txt"
+    f.write_text("# c\n\npython3\nchrony\n")
+    assert _sync.read_apt_packages(tree) == ["python3", "chrony"]
+
+
+def test_step_files_tracks_units_and_restarts(ctx, tree):
+    f = _sync.files_dir(tree)
+    (f / "dhcp").mkdir()
+    (f / "dhcp" / "dhcpd.conf").write_text("subnet {}\n")
+    (f / "dhcp" / "isc-dhcp-server").write_text("INTERFACESv4=eth0\n")
+    # redis.conf must exist for the include-append
+    rc = ctx.dest("/etc/redis/redis.conf")
+    rc.parent.mkdir(parents=True)
+    rc.write_text("bind 0.0.0.0\n")
+    (f / "redis").mkdir()
+    for n in ("eigsep.conf", "ephemeral.conf", "persistent.conf"):
+        (f / "redis" / n).write_text(f"# {n}\n")
+    (f / "chrony").mkdir()
+    (f / "chrony" / "client.conf").write_text("server x\n")
+    (f / "etc-eigsep").mkdir()
+    (f / "etc-eigsep" / "uv.toml").write_text("[pip]\n")
+    (f / "etc-eigsep" / "motd").write_text("r {{release}}\n")
+    (f / "etc-profile-d").mkdir()
+    (f / "etc-profile-d" / "eigsep.sh").write_text("export A=1\n")
+    (f / "sudoers.d").mkdir()
+    (f / "sudoers.d" / "eigsep-field").write_text("eigsep ALL=x\n")
+    (f / "CHEATSHEET.md").write_text("# {{release}}\n")
+    import unittest.mock as mock
+
+    with mock.patch.object(_sync, "_sudoers_ok", return_value=True):
+        _sync.step_files(ctx)
+    assert "demo.service" in ctx.changed_units
+    assert "chrony-wait.service" in ctx.changed_units
+    assert "isc-dhcp-server.service" in ctx.restart_units
+    assert ctx.dest("/etc/eigsep/manifest.toml").exists()
+
+
+def test_run_sync_dry_run_smoke_on_real_repo(capsys):
+    import argparse
+
+    args = argparse.Namespace(
+        src=str(REPO),
+        root="/",
+        dry_run=True,
+        skip=None,
+        only=["files", "removals"],
+    )
+    rc = _sync.run_sync(args)
+    out = capsys.readouterr().out
+    assert "files" in out
+    assert rc == 0 or rc == 1  # dev box may lack /etc/redis
+
+
+def test_run_sync_only_and_skip_selection():
+    sel = _sync.select_steps(only=["files", "verify"], skip=["verify"])
+    assert sel == ["files"]
+    assert _sync.select_steps(only=None, skip=None) == list(_sync.STEP_ORDER)
+
+
+def test_cli_wires_sync_image(monkeypatch):
+    from eigsep_field import cli
+
+    seen = {}
+    monkeypatch.setattr(cli, "run_sync", lambda args: seen.setdefault("ok", 0))
+    rc = cli.main(["sync-image", "--dry-run"])
+    assert rc == 0
+    assert seen == {"ok": 0}

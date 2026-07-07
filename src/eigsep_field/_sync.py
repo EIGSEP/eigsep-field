@@ -28,7 +28,12 @@ import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from eigsep_field._patch import SRC_ROOT, VENV_PATH, WHEELHOUSE
+from eigsep_field._patch import (
+    EIGSEP_FIELD_PROJECT,
+    SRC_ROOT,
+    VENV_PATH,
+    WHEELHOUSE,
+)
 from eigsep_field._services import (
     entry_for_role,
     parse_role_file,
@@ -585,3 +590,250 @@ def step_sources(ctx: SyncContext) -> None:
         marker.write_text(commit + "\n")
         os.chown(marker, st.st_uid, st.st_gid)
         ctx.note(f"sources {t.name}: blessed = {t.tag} ({commit[:9]})")
+
+
+def read_apt_packages(tree: Path) -> list[str]:
+    p = files_dir(tree) / "apt-packages.txt"
+    out = []
+    for raw in p.read_text().splitlines():
+        line = raw.strip()
+        if line and not line.startswith("#"):
+            out.append(line)
+    return out
+
+
+def step_apt(ctx: SyncContext) -> None:
+    pkgs = read_apt_packages(ctx.tree)
+    if ctx.dry_run:
+        ctx.note(f"would apt-get install {len(pkgs)} packages")
+        return
+    if _run(["apt-get", "update"]).returncode != 0:
+        ctx.fail("apt-get update failed")
+        return
+    r = _run(
+        [
+            "apt-get",
+            "install",
+            "-y",
+            "--no-install-recommends",
+            "-o",
+            "Dpkg::Options::=--force-confold",
+            *pkgs,
+        ]
+    )
+    if r.returncode != 0:
+        ctx.fail("apt-get install failed")
+    else:
+        ctx.note(f"apt: {len(pkgs)} packages present")
+
+
+def step_files(ctx: SyncContext) -> None:
+    udev_changed = False
+    for entry, src in iter_map_files(ctx.tree):
+        try:
+            changed = install_file(ctx, entry, src)
+        except OSError as e:
+            ctx.fail(f"{src.name}: {e}")
+            continue
+        if not changed:
+            continue
+        if entry.dest_dir == "/etc/systemd/system":
+            if entry.preserve_parent:
+                ctx.changed_units.add(src.parent.name[: -len(".d")])
+            else:
+                ctx.changed_units.add(src.name)
+        if entry.src.startswith("udev/"):
+            udev_changed = True
+        if entry.unit:
+            ctx.restart_units.add(entry.unit)
+    refresh_etc_manifest(ctx)
+    append_redis_includes(ctx)
+    if udev_changed and not ctx.dry_run:
+        if _run(["udevadm", "control", "--reload"]).returncode != 0:
+            ctx.fail("udevadm control --reload failed")
+
+
+def step_systemd(ctx: SyncContext) -> None:
+    if ctx.dry_run:
+        ctx.note("would daemon-reload + enable always-services")
+        return
+    if ctx.changed_units:
+        rc, msg = systemctl("daemon-reload")
+        if rc != 0:
+            ctx.fail(f"daemon-reload: {msg}")
+        for unit in sorted(ctx.changed_units):
+            ctx.note(f"unit changed: {unit} (restart to adopt)")
+    from eigsep_field import _image_install
+
+    if _image_install._cmd_enable_always(None):
+        ctx.fail("enable-always reported failures")
+    # keep timesyncd from fighting chrony (mirrors _chroot-install.sh)
+    systemctl("disable", "systemd-timesyncd.service")
+    systemctl("mask", "systemd-timesyncd.service")
+    for unit in sorted(ctx.restart_units):
+        systemctl("try-reload-or-restart", unit)
+
+
+def step_role(ctx: SyncContext) -> None:
+    if ctx.dry_run:
+        ctx.note("would re-apply role (hostname, IP, snippets, units)")
+        return
+    from eigsep_field import cli as _cli
+
+    if _cli._cmd_apply_role(argparse.Namespace(role_conf=None)):
+        ctx.fail("_apply-role reported failures")
+
+
+def step_dirs(ctx: SyncContext) -> None:
+    if ctx.dry_run:
+        ctx.note("would ensure dirs, ownership, and symlinks")
+        return
+    for d in ("/opt/eigsep/captures", "/opt/eigsep/cmt-vna/bin"):
+        p = ctx.dest(d)
+        p.mkdir(parents=True, exist_ok=True)
+    for d in (
+        "/opt/eigsep/captures",
+        "/opt/eigsep/cmt-vna",
+        "/opt/eigsep/cmt-vna/bin",
+    ):
+        try:
+            shutil.chown(ctx.dest(d), "eigsep", "eigsep")
+        except (KeyError, LookupError):
+            ctx.note("user 'eigsep' missing; skipping chown")
+            break
+    links = [
+        ("/usr/local/bin/eigsep-field", VENV_PATH / "bin/eigsep-field"),
+        ("/home/eigsep/src", ctx.dest("/opt/eigsep/src")),
+        ("/home/eigsep/captures", ctx.dest("/opt/eigsep/captures")),
+        (
+            "/home/eigsep/CHEATSHEET.md",
+            ctx.dest("/opt/eigsep/CHEATSHEET.md"),
+        ),
+    ]
+    for link, target in links:
+        lp = ctx.dest(link)
+        if link.startswith("/home/") and not lp.parent.is_dir():
+            continue
+        lp.parent.mkdir(parents=True, exist_ok=True)
+        if lp.is_symlink() or lp.exists():
+            lp.unlink()
+        lp.symlink_to(target)
+
+
+def step_verify(ctx: SyncContext) -> None:
+    if ctx.dry_run:
+        ctx.note("would run eigsep-field doctor")
+        return
+    from eigsep_field import cli as _cli
+
+    rc = _cli._cmd_doctor(argparse.Namespace())
+    # Advisory only: doctor can flag things sync can't fix.
+    ctx.note(f"doctor: {'OK' if rc == 0 else 'REPORTED PROBLEMS'}")
+
+
+STEP_ORDER: tuple[str, ...] = (
+    "apt",
+    "wheelhouse",
+    "files",
+    "removals",
+    "systemd",
+    "role",
+    "sources",
+    "firmware",
+    "external",
+    "dirs",
+    "verify",
+)
+
+STEPS = {
+    "apt": step_apt,
+    "wheelhouse": step_wheelhouse,
+    "files": step_files,
+    "removals": step_removals,
+    "systemd": step_systemd,
+    "role": step_role,
+    "sources": step_sources,
+    "firmware": step_firmware,
+    "external": step_external,
+    "dirs": step_dirs,
+    "verify": step_verify,
+}
+
+
+def select_steps(only: list[str] | None, skip: list[str] | None) -> list[str]:
+    sel = [s for s in STEP_ORDER if not only or s in only]
+    return [s for s in sel if not skip or s not in skip]
+
+
+def _self_update(args: argparse.Namespace, tree: Path) -> None:
+    """pip-install the tree, then re-exec once on the new code."""
+    if os.environ.get("EIGSEP_SYNC_REEXEC"):
+        return
+    if args.only and "self-update" not in args.only:
+        return
+    if args.skip and "self-update" in args.skip:
+        return
+    print("== self-update ==")
+    pip = str(VENV_PATH / "bin" / "pip")
+    r = _run([pip, "install", "--quiet", str(tree)])
+    if r.returncode != 0:
+        print(
+            "  warn: self-update pip install failed; continuing",
+            file=sys.stderr,
+        )
+        return
+    os.environ["EIGSEP_SYNC_REEXEC"] = "1"
+    os.execv(
+        sys.executable,
+        [sys.executable, "-m", "eigsep_field.cli", *sys.argv[1:]],
+    )
+
+
+def run_sync(args: argparse.Namespace) -> int:
+    tree = Path(args.src) if args.src else EIGSEP_FIELD_PROJECT
+    if not (tree / "manifest.toml").exists():
+        print(f"no manifest.toml under {tree}", file=sys.stderr)
+        return 2
+    if not args.dry_run and os.geteuid() != 0:
+        print("sync-image must run as root (sudo)", file=sys.stderr)
+        return 2
+    # Behind-upstream warning only on real runs: --dry-run stays
+    # fully offline/read-only.
+    if (tree / ".git").exists() and not args.dry_run:
+        kw = _git_kwargs(tree)
+        _run(["git", "-C", str(tree), "fetch", "-q"], **kw)
+        r = _run(
+            [
+                "git",
+                "-C",
+                str(tree),
+                "rev-list",
+                "--count",
+                "HEAD..@{upstream}",
+            ],
+            **kw,
+        )
+        behind = r.stdout.strip() if r.returncode == 0 else "0"
+        if behind not in ("", "0"):
+            print(
+                f"warn: tree is {behind} commit(s) behind upstream — "
+                "git pull first if that's unintended",
+                file=sys.stderr,
+            )
+    if not args.dry_run:
+        _self_update(args, tree)
+    manifest = tomllib.loads((tree / "manifest.toml").read_text())
+    ctx = SyncContext(
+        tree=tree,
+        manifest=manifest,
+        root=Path(getattr(args, "root", "/") or "/"),
+        dry_run=args.dry_run,
+    )
+    for name in select_steps(args.only, args.skip):
+        print(f"== {name} ==")
+        STEPS[name](ctx)
+    print(
+        f"sync-image: {ctx.failures} failure(s)"
+        + (" [dry-run]" if ctx.dry_run else "")
+    )
+    return 1 if ctx.failures else 0
