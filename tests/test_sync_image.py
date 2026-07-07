@@ -175,3 +175,55 @@ def test_template_files_render_on_install(ctx, tree):
     body = ctx.dest("/etc/motd").read_text()
     assert "release 2026.4.0" in body
     assert "{{dev_banner}}" not in body
+
+
+@pytest.fixture
+def fake_systemctl(monkeypatch):
+    calls: list[tuple[str, ...]] = []
+
+    def _sc(*args):
+        calls.append(args)
+        return 0, ""
+
+    monkeypatch.setattr(_sync, "systemctl", _sc)
+    return calls
+
+
+def _write_tombstones(tree, lines):
+    p = tree / _sync.STAGE_REL / "removed-paths.txt"
+    p.write_text("\n".join(lines) + "\n")
+
+
+def test_removals_deletes_and_disables_unit(ctx, tree, fake_systemctl):
+    _write_tombstones(
+        tree, ["# gone", "/etc/systemd/system/eigsep-panda.service"]
+    )
+    stale = ctx.dest("/etc/systemd/system/eigsep-panda.service")
+    stale.parent.mkdir(parents=True)
+    stale.write_text("[Unit]\n")
+    _sync.step_removals(ctx)
+    assert not stale.exists()
+    assert (
+        "disable",
+        "--now",
+        "eigsep-panda.service",
+    ) in fake_systemctl
+    assert "eigsep-panda.service" in ctx.changed_units
+
+
+def test_removals_missing_path_is_silent_noop(ctx, tree, fake_systemctl):
+    _write_tombstones(tree, ["/etc/systemd/system/never-existed.service"])
+    _sync.step_removals(ctx)
+    assert fake_systemctl == []
+    assert ctx.failures == 0
+
+
+def test_removals_dry_run_keeps_file(ctx, tree, fake_systemctl):
+    ctx.dry_run = True
+    _write_tombstones(tree, ["/etc/old.conf"])
+    old = ctx.dest("/etc/old.conf")
+    old.parent.mkdir(parents=True)
+    old.write_text("x")
+    _sync.step_removals(ctx)
+    assert old.exists()
+    assert fake_systemctl == []

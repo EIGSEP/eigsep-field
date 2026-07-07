@@ -13,6 +13,7 @@ docs/superpowers/specs/2026-07-07-sync-image-design.md
 
 from __future__ import annotations
 
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -266,3 +267,43 @@ def install_file(ctx: SyncContext, entry: FileMapEntry, src: Path) -> bool:
     dest.chmod(entry.mode)
     ctx.note(f"installed {dest}")
     return True
+
+
+def removed_paths_file(tree: Path) -> Path:
+    return tree / STAGE_REL / "removed-paths.txt"
+
+
+def read_removed_paths(tree: Path) -> list[str]:
+    p = removed_paths_file(tree)
+    if not p.exists():
+        return []
+    out = []
+    for raw in p.read_text().splitlines():
+        line = raw.strip()
+        if line and not line.startswith("#"):
+            out.append(line)
+    return out
+
+
+def step_removals(ctx: SyncContext) -> None:
+    """Delete tombstoned paths left behind by older images."""
+    for path in read_removed_paths(ctx.tree):
+        target = ctx.dest(path)
+        if not target.exists() and not target.is_symlink():
+            continue
+        is_unit = path.startswith("/etc/systemd/system/") and path.endswith(
+            (".service", ".target")
+        )
+        if ctx.dry_run:
+            ctx.note(f"would remove {target}")
+            continue
+        if is_unit:
+            unit = Path(path).name
+            # rc ignored: "not loaded" is fine, the file still goes.
+            systemctl("disable", "--now", unit)
+            ctx.changed_units.add(unit)
+        if target.is_dir() and not target.is_symlink():
+            shutil.rmtree(target)
+        else:
+            target.unlink()
+        ctx.note(f"removed {target}")
