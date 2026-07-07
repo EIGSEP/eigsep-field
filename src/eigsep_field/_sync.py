@@ -13,6 +13,7 @@ docs/superpowers/specs/2026-07-07-sync-image-design.md
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import os
 import re
@@ -27,7 +28,7 @@ import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from eigsep_field._patch import VENV_PATH, WHEELHOUSE
+from eigsep_field._patch import SRC_ROOT, VENV_PATH, WHEELHOUSE
 from eigsep_field._services import (
     entry_for_role,
     parse_role_file,
@@ -529,3 +530,50 @@ def step_external(ctx: SyncContext) -> None:
             ctx.fail(f"external {name}: install script failed")
         else:
             ctx.note(f"external {name}: installed")
+
+
+def _git_kwargs(repo: Path) -> dict:
+    """Run git as the clone's owner so root never pollutes .git."""
+    kw: dict = {"capture_output": True, "text": True}
+    if os.geteuid() == 0:
+        st = repo.stat()
+        kw["user"] = st.st_uid
+        kw["group"] = st.st_gid
+    return kw
+
+
+def step_sources(ctx: SyncContext) -> None:
+    """Clone new manifest siblings; refresh blessed-commit markers."""
+    from eigsep_field import _image_install
+
+    targets = _image_install._clone_targets(ctx.manifest)
+    missing = [t for t in targets if not (SRC_ROOT / t.clone_path).exists()]
+    if ctx.dry_run:
+        for t in missing:
+            ctx.note(f"would clone {t.name} ({t.tag})")
+    elif missing:
+        ns = argparse.Namespace(src_root=str(SRC_ROOT), user="eigsep")
+        if _image_install._cmd_clone_sources(ns):
+            ctx.fail("clone-sources reported failures")
+    for t in targets:
+        repo = SRC_ROOT / t.clone_path
+        if not (repo / ".git").exists():
+            continue
+        kw = _git_kwargs(repo)
+        if not ctx.dry_run:
+            _run(["git", "-C", str(repo), "fetch", "--tags", "-q"], **kw)
+        r = _run(["git", "-C", str(repo), "rev-list", "-n1", t.tag], **kw)
+        if r.returncode != 0:
+            ctx.fail(f"sources {t.name}: cannot resolve {t.tag}")
+            continue
+        commit = r.stdout.strip()
+        marker = repo / ".eigsep-blessed-commit"
+        if marker.exists() and marker.read_text().strip() == commit:
+            continue
+        if ctx.dry_run:
+            ctx.note(f"would refresh blessed marker for {t.name}")
+            continue
+        st = repo.stat()
+        marker.write_text(commit + "\n")
+        os.chown(marker, st.st_uid, st.st_gid)
+        ctx.note(f"sources {t.name}: blessed = {t.tag} ({commit[:9]})")

@@ -428,3 +428,63 @@ def test_external_installs_when_binary_missing(panda_ctx, monkeypatch):
     _sync.step_external(panda_ctx)
     assert runs and runs[0][0] == "bash"
     assert runs[0][1].endswith("install-cmtvna.sh")
+
+
+def _git(*args, cwd):
+    subprocess.run(
+        ["git", *args],
+        cwd=cwd,
+        check=True,
+        capture_output=True,
+        env={
+            "GIT_AUTHOR_NAME": "t",
+            "GIT_AUTHOR_EMAIL": "t@t",
+            "GIT_COMMITTER_NAME": "t",
+            "GIT_COMMITTER_EMAIL": "t@t",
+            "PATH": "/usr/bin:/bin",
+            "HOME": str(cwd),
+        },
+    )
+
+
+def test_sources_refreshes_blessed_marker(ctx, tmp_path, monkeypatch):
+    # upstream repo with two tags
+    upstream = tmp_path / "upstream"
+    upstream.mkdir()
+    _git("init", "-q", cwd=upstream)
+    (upstream / "f").write_text("1")
+    _git("add", "f", cwd=upstream)
+    _git("commit", "-qm", "one", cwd=upstream)
+    _git("tag", "v1.0.0", cwd=upstream)
+    (upstream / "f").write_text("2")
+    _git("commit", "-aqm", "two", cwd=upstream)
+    _git("tag", "v2.0.0", cwd=upstream)
+
+    src_root = tmp_path / "src"
+    src_root.mkdir()
+    subprocess.run(
+        ["git", "clone", "-q", "-b", "v1.0.0", str(upstream), "demo"],
+        cwd=src_root,
+        check=True,
+        capture_output=True,
+    )
+    old = "0" * 40
+    (src_root / "demo" / ".eigsep-blessed-commit").write_text(old + "\n")
+    monkeypatch.setattr(_sync, "SRC_ROOT", src_root)
+    ctx.manifest["packages"] = {
+        "demo": {
+            "source": str(upstream),
+            "tag": "v2.0.0",
+            "version": "2.0.0",
+        }
+    }
+    _sync.step_sources(ctx)
+    marker = (src_root / "demo" / ".eigsep-blessed-commit").read_text().strip()
+    v2 = subprocess.run(
+        ["git", "rev-list", "-n1", "v2.0.0"],
+        cwd=upstream,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    assert marker == v2
