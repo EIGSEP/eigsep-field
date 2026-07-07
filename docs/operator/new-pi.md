@@ -4,6 +4,10 @@ The runbook for adding a new Raspberry Pi to the EIGSEP field stack.
 Cross-references where state needs to land in this repo so nothing
 drifts back onto a personal machine.
 
+> Updating an already-flashed Pi instead? See
+> [update-pi.md](update-pi.md) — `eigsep-field sync-image` does it in
+> place, no SD-card pull needed.
+
 ## 1. Decide the role
 
 Each Pi runs one role:
