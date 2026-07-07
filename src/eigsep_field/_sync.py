@@ -16,6 +16,7 @@ from __future__ import annotations
 import subprocess
 import sys
 import tempfile
+import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -136,8 +137,97 @@ def dest_path(ctx: SyncContext, entry: FileMapEntry, src: Path) -> Path:
     return d / src.name
 
 
+def render_template(text: str, release: str, dev_banner: str) -> str:
+    if dev_banner:
+        text = text.replace("{{dev_banner}}", dev_banner)
+    else:
+        kept = [ln for ln in text.splitlines() if "{{dev_banner}}" not in ln]
+        text = "\n".join(kept) + "\n"
+    return text.replace("{{release}}", release)
+
+
+def read_dev_banner(ctx: SyncContext) -> str:
+    """DEV-image banner from the on-Pi manifest's [image] block.
+
+    DEV-ness is a property of the flashed image, not of the tree —
+    preserved across syncs (mirrors image.yml's stamp step)."""
+    p = ctx.dest("/etc/eigsep/manifest.toml")
+    if not p.exists():
+        return ""
+    img = tomllib.loads(p.read_text()).get("image", {})
+    if not img.get("dev"):
+        return ""
+    sha = img.get("sha", "unknown")
+    return f"*** DEV BUILD {sha} — not a blessed release ***"
+
+
 def _render(ctx: SyncContext, entry: FileMapEntry, src: Path) -> bytes:
-    return src.read_bytes()
+    data = src.read_bytes()
+    if entry.special == "template":
+        text = render_template(
+            data.decode(),
+            ctx.manifest["release"],
+            read_dev_banner(ctx),
+        )
+        data = text.encode()
+    return data
+
+
+def refresh_etc_manifest(ctx: SyncContext) -> None:
+    """Tree manifest → /etc/eigsep/manifest.toml, [image] preserved."""
+    dest = ctx.dest("/etc/eigsep/manifest.toml")
+    text = (ctx.tree / "manifest.toml").read_text()
+    image: dict = {}
+    if dest.exists():
+        image = tomllib.loads(dest.read_text()).get("image", {})
+    if image:
+        lines = ["", "[image]"]
+        for k, v in image.items():
+            if isinstance(v, bool):
+                lines.append(f"{k} = {str(v).lower()}")
+            else:
+                lines.append(f'{k} = "{v}"')
+        text += "\n".join(lines) + "\n"
+    if dest.exists() and dest.read_text() == text:
+        return
+    if ctx.dry_run:
+        ctx.note(f"would refresh {dest}")
+        return
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text(text)
+    ctx.note(f"refreshed {dest}")
+
+
+REDIS_INCLUDES = (
+    (
+        "# EIGSEP field overrides — see /etc/redis/redis.conf.d/eigsep.conf",
+        "include /etc/redis/redis.conf.d/eigsep.conf",
+    ),
+    (
+        "# EIGSEP role-conditional persistence — symlink managed by\n"
+        "# eigsep-field _apply-role; snippets in /etc/eigsep/redis/.",
+        "include /etc/redis/redis.conf.d/eigsep-role.conf",
+    ),
+)
+
+
+def append_redis_includes(ctx: SyncContext) -> None:
+    """Idempotent include lines, mirroring _chroot-install.sh."""
+    conf = ctx.dest("/etc/redis/redis.conf")
+    if not conf.exists():
+        ctx.fail(f"{conf} missing (redis-server not installed?)")
+        return
+    body = conf.read_text()
+    for comment, include in REDIS_INCLUDES:
+        if include in body:
+            continue
+        if ctx.dry_run:
+            ctx.note(f"would append '{include}' to {conf}")
+            continue
+        body += f"\n{comment}\n{include}\n"
+        ctx.note(f"appended '{include}' to {conf}")
+    if not ctx.dry_run:
+        conf.write_text(body)
 
 
 def _sudoers_ok(data: bytes) -> bool:

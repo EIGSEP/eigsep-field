@@ -94,3 +94,84 @@ def test_file_map_covers_real_repo():
     assert "usb-cmt-vna.rules" in srcs
     assert "motd" in srcs
     assert "CHEATSHEET.md" in srcs
+
+
+def test_render_template_release_and_dev_banner():
+    text = "# release {{release}}\n{{dev_banner}}\nbody\n"
+    out = _sync.render_template(text, "2026.4.0", "*** DEV abc ***")
+    assert "release 2026.4.0" in out
+    assert "*** DEV abc ***" in out
+
+
+def test_render_template_strips_banner_line_when_blessed():
+    text = "# release {{release}}\n{{dev_banner}}\nbody\n"
+    out = _sync.render_template(text, "2026.4.0", "")
+    assert "{{dev_banner}}" not in out
+    assert out.splitlines() == ["# release 2026.4.0", "body"]
+
+
+def test_read_dev_banner(ctx):
+    etc = ctx.dest("/etc/eigsep")
+    etc.mkdir(parents=True)
+    (etc / "manifest.toml").write_text(
+        'release = "2026.3.0"\n[image]\ndev = true\nsha = "abc1234"\n'
+    )
+    assert "abc1234" in _sync.read_dev_banner(ctx)
+
+
+def test_read_dev_banner_blessed_or_missing(ctx):
+    assert _sync.read_dev_banner(ctx) == ""
+
+
+def test_refresh_etc_manifest_preserves_image_block(ctx):
+    etc = ctx.dest("/etc/eigsep")
+    etc.mkdir(parents=True)
+    (etc / "manifest.toml").write_text(
+        'release = "2026.3.0"\n[image]\ndev = true\nsha = "abc1234"\n'
+    )
+    _sync.refresh_etc_manifest(ctx)
+    import tomllib
+
+    m = tomllib.loads((etc / "manifest.toml").read_text())
+    assert m["release"] == "2026.4.0"
+    assert m["image"] == {"dev": True, "sha": "abc1234"}
+
+
+def test_append_redis_includes_idempotent(ctx):
+    redis = ctx.dest("/etc/redis")
+    redis.mkdir(parents=True)
+    conf = redis / "redis.conf"
+    conf.write_text("bind 127.0.0.1\n")
+    _sync.append_redis_includes(ctx)
+    _sync.append_redis_includes(ctx)
+    body = conf.read_text()
+    assert body.count("include /etc/redis/redis.conf.d/eigsep.conf") == 1
+    assert body.count("include /etc/redis/redis.conf.d/eigsep-role.conf") == 1
+
+
+def test_sudoers_gate_rejects_bad_file(ctx, tree, monkeypatch):
+    f = _sync.files_dir(tree) / "sudoers.d"
+    f.mkdir()
+    (f / "eigsep-field").write_text("syntactically wrong\n")
+    monkeypatch.setattr(_sync, "_sudoers_ok", lambda data: False)
+    entry = _sync.FileMapEntry(
+        "sudoers.d/eigsep-field",
+        "/etc/sudoers.d",
+        mode=0o440,
+        special="sudoers",
+    )
+    src = f / "eigsep-field"
+    assert _sync.install_file(ctx, entry, src) is False
+    assert ctx.failures == 1
+    assert not ctx.dest("/etc/sudoers.d/eigsep-field").exists()
+
+
+def test_template_files_render_on_install(ctx, tree):
+    f = _sync.files_dir(tree) / "etc-eigsep"
+    f.mkdir(parents=True)
+    (f / "motd").write_text("release {{release}}\n{{dev_banner}}\n")
+    entry = _sync.FileMapEntry("etc-eigsep/motd", "/etc", special="template")
+    _sync.install_file(ctx, entry, f / "motd")
+    body = ctx.dest("/etc/motd").read_text()
+    assert "release 2026.4.0" in body
+    assert "{{dev_banner}}" not in body
