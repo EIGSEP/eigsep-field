@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import hashlib
+import subprocess
+import tarfile
 from pathlib import Path
 
 import pytest
@@ -227,3 +230,106 @@ def test_removals_dry_run_keeps_file(ctx, tree, fake_systemctl):
     _sync.step_removals(ctx)
     assert old.exists()
     assert fake_systemctl == []
+
+
+def _make_wheel_tar(tmp_path, release):
+    src = tmp_path / "wh-src"
+    src.mkdir()
+    (src / "requirements.txt").write_text(
+        f"somepkg==1.0\neigsep-field=={release} \\\n"
+        "    --hash=sha256:deadbeef\n"
+    )
+    tar = tmp_path / "wheels-linux_aarch64.tar.xz"
+    with tarfile.open(tar, "w:xz") as tf:
+        for p in src.iterdir():
+            tf.add(p, arcname=p.name)
+    sha = hashlib.sha256(tar.read_bytes()).hexdigest()
+    return tar, sha
+
+
+def test_wheelhouse_pin_parses_appended_line(tmp_path):
+    (tmp_path / "requirements.txt").write_text(
+        "a==1\neigsep-field==2026.4.0 \\\n    --hash=sha256:ff\n"
+    )
+    assert _sync.wheelhouse_pin(tmp_path) == "2026.4.0"
+
+
+def test_wheelhouse_skips_when_pin_matches(ctx, tmp_path, monkeypatch):
+    wh = tmp_path / "wheels"
+    wh.mkdir()
+    (wh / "requirements.txt").write_text("eigsep-field==2026.4.0\n")
+    monkeypatch.setattr(_sync, "WHEELHOUSE", wh)
+    called = []
+    monkeypatch.setattr(_sync, "_download", lambda *a: called.append(a))
+    _sync.step_wheelhouse(ctx)
+    assert called == []
+    assert ctx.failures == 0
+
+
+def test_wheelhouse_swap_and_pip(ctx, tmp_path, monkeypatch):
+    tar, sha = _make_wheel_tar(tmp_path, "2026.4.0")
+    wh = tmp_path / "opt" / "wheels"
+    wh.mkdir(parents=True)
+    (wh / "requirements.txt").write_text("eigsep-field==2026.3.0\n")
+    monkeypatch.setattr(_sync, "WHEELHOUSE", wh)
+
+    def fake_download(url, dest):
+        if url.endswith(".sha256"):
+            dest.write_text(f"{sha}  wheels-linux_aarch64.tar.xz\n")
+        else:
+            dest.write_bytes(tar.read_bytes())
+
+    monkeypatch.setattr(_sync, "_download", fake_download)
+    runs = []
+
+    def fake_run(cmd, **kw):
+        runs.append(cmd)
+        # git commands fail (fake tree has no tag) → the post-swap
+        # tree reinstall must trigger; everything else succeeds.
+        rc = 1 if cmd[0] == "git" else 0
+        return subprocess.CompletedProcess(cmd, rc, "", "")
+
+    monkeypatch.setattr(_sync, "_run", fake_run)
+    _sync.step_wheelhouse(ctx)
+    assert _sync.wheelhouse_pin(wh) == "2026.4.0"
+    assert (wh.parent / "wheels.prev" / "requirements.txt").exists()
+    assert (wh.parent / "previous-release").read_text() == "2026.3.0"
+    pip = str(_sync.VENV_PATH / "bin" / "pip")
+    assert any(c[:2] == [pip, "install"] and "-r" in c for c in runs)
+    assert any(str(ctx.tree) in c for c in runs)  # tree reinstall
+
+
+def test_wheelhouse_sha_mismatch_keeps_old(ctx, tmp_path, monkeypatch):
+    tar, _ = _make_wheel_tar(tmp_path, "2026.4.0")
+    wh = tmp_path / "opt" / "wheels"
+    wh.mkdir(parents=True)
+    (wh / "requirements.txt").write_text("eigsep-field==2026.3.0\n")
+    monkeypatch.setattr(_sync, "WHEELHOUSE", wh)
+
+    def fake_download(url, dest):
+        if url.endswith(".sha256"):
+            dest.write_text("0" * 64 + "  wheels-linux_aarch64.tar.xz\n")
+        else:
+            dest.write_bytes(tar.read_bytes())
+
+    monkeypatch.setattr(_sync, "_download", fake_download)
+    _sync.step_wheelhouse(ctx)
+    assert ctx.failures == 1
+    assert _sync.wheelhouse_pin(wh) == "2026.3.0"
+
+
+def test_wheelhouse_404_warns_and_skips(ctx, tmp_path, monkeypatch):
+    import urllib.error
+
+    wh = tmp_path / "wheels"
+    wh.mkdir()
+    (wh / "requirements.txt").write_text("eigsep-field==2026.3.0\n")
+    monkeypatch.setattr(_sync, "WHEELHOUSE", wh)
+
+    def fake_download(url, dest):
+        raise urllib.error.HTTPError(url, 404, "nf", {}, None)
+
+    monkeypatch.setattr(_sync, "_download", fake_download)
+    _sync.step_wheelhouse(ctx)
+    assert ctx.failures == 0  # mid-cycle: warn, not fail
+    assert _sync.wheelhouse_pin(wh) == "2026.3.0"

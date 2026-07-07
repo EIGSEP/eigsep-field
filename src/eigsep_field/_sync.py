@@ -13,14 +13,20 @@ docs/superpowers/specs/2026-07-07-sync-image-design.md
 
 from __future__ import annotations
 
+import hashlib
+import re
 import shutil
 import subprocess
 import sys
+import tarfile
 import tempfile
 import tomllib
+import urllib.error
+import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from eigsep_field._patch import VENV_PATH, WHEELHOUSE
 from eigsep_field._services import systemctl  # noqa: F401 (later steps)
 
 STAGE_REL = "image/pi-gen-config/stage-eigsep/00-eigsep-install"
@@ -283,6 +289,142 @@ def read_removed_paths(tree: Path) -> list[str]:
         if line and not line.startswith("#"):
             out.append(line)
     return out
+
+
+RELEASES_BASE = "https://github.com/EIGSEP/eigsep-field"
+
+
+def _run(cmd: list[str], **kw) -> subprocess.CompletedProcess:
+    return subprocess.run(cmd, **kw)
+
+
+def _download(url: str, dest: Path) -> None:
+    req = urllib.request.Request(
+        url, headers={"User-Agent": "eigsep-field-sync"}
+    )
+    with urllib.request.urlopen(req, timeout=120) as r:
+        with dest.open("wb") as f:
+            shutil.copyfileobj(r, f)
+
+
+def _sha256(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def wheelhouse_pin(wheels: Path) -> str | None:
+    """The eigsep-field== pin build-wheelhouse.sh appended, or None."""
+    req = wheels / "requirements.txt"
+    if not req.exists():
+        return None
+    m = re.search(
+        r"^eigsep[-_]field==([0-9A-Za-z.!+-]+)",
+        req.read_text(),
+        re.MULTILINE,
+    )
+    return m.group(1) if m else None
+
+
+def _pip_install_wheelhouse(ctx: SyncContext) -> None:
+    pip = str(VENV_PATH / "bin" / "pip")
+    reqs = [WHEELHOUSE / "requirements.txt"]
+    hw = WHEELHOUSE / "hardware-requirements.txt"
+    if hw.exists():
+        reqs.append(hw)
+    for req in reqs:
+        r = _run(
+            [
+                pip,
+                "install",
+                "--no-index",
+                "--find-links",
+                str(WHEELHOUSE),
+                "--require-hashes",
+                "-r",
+                str(req),
+            ]
+        )
+        if r.returncode != 0:
+            ctx.fail(f"pip install -r {req} failed")
+            return
+    # The blessed wheel just overwrote the self-updated tree install.
+    # If the tree is not exactly the blessed tag, put the tree back.
+    release = ctx.manifest["release"]
+    head = _run(
+        ["git", "-C", str(ctx.tree), "rev-parse", "HEAD"],
+        capture_output=True,
+        text=True,
+    )
+    tag = _run(
+        ["git", "-C", str(ctx.tree), "rev-list", "-n1", f"v{release}"],
+        capture_output=True,
+        text=True,
+    )
+    if (
+        head.returncode != 0
+        or tag.returncode != 0
+        or head.stdout.strip() != tag.stdout.strip()
+    ):
+        ctx.note("tree is ahead of blessed tag; reinstalling tree")
+        r = _run([pip, "install", "--quiet", str(ctx.tree)])
+        if r.returncode != 0:
+            ctx.fail("pip install <tree> after swap failed")
+
+
+def step_wheelhouse(ctx: SyncContext) -> None:
+    """Swap /opt/eigsep/wheels to the blessed release artifact."""
+    release = ctx.manifest["release"]
+    pin = wheelhouse_pin(WHEELHOUSE)
+    if pin == release:
+        ctx.note(f"wheelhouse already at {release}")
+        return
+    platform = ctx.manifest.get("system", {}).get("platform", "linux_aarch64")
+    asset = f"wheels-{platform}.tar.xz"
+    url = f"{RELEASES_BASE}/releases/download/v{release}/{asset}"
+    if ctx.dry_run:
+        ctx.note(f"would download {url} and reinstall the venv")
+        return
+    with tempfile.TemporaryDirectory(dir=WHEELHOUSE.parent) as tmpdir:
+        td = Path(tmpdir)
+        tar = td / asset
+        shafile = td / (asset + ".sha256")
+        try:
+            _download(url, tar)
+            _download(url + ".sha256", shafile)
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                ctx.note(
+                    f"no wheelhouse published for v{release} "
+                    "(mid-cycle tree?); skipping venv sync"
+                )
+                return
+            ctx.fail(f"download {url}: {e}")
+            return
+        except urllib.error.URLError as e:
+            ctx.fail(f"download {url}: {e}")
+            return
+        want = shafile.read_text().split()[0]
+        if _sha256(tar) != want:
+            ctx.fail(f"sha256 mismatch for {asset}; keeping wheelhouse")
+            return
+        new = td / "wheels"
+        new.mkdir()
+        with tarfile.open(tar) as tf:
+            tf.extractall(new, filter="data")
+        prev = WHEELHOUSE.parent / "wheels.prev"
+        if prev.exists():
+            shutil.rmtree(prev)
+        if WHEELHOUSE.exists():
+            WHEELHOUSE.rename(prev)
+            (WHEELHOUSE.parent / "previous-release").write_text(
+                pin or "unknown"
+            )
+        shutil.move(str(new), str(WHEELHOUSE))
+    ctx.note(f"wheelhouse: {pin or 'none'} -> {release}")
+    _pip_install_wheelhouse(ctx)
 
 
 def step_removals(ctx: SyncContext) -> None:
