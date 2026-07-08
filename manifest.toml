@@ -7,10 +7,10 @@
 # After editing this file, run `./scripts/refresh-lock.sh` to regenerate
 # uv.lock, requirements.txt, and requirements-hashed.txt.
 
-release      = "2026.4.0"
+release      = "2026.7.0b1"
 python       = "3.13"
-released_at  = "2026-04-21"
-notes        = "docs/releases/2026.4.0.md"
+released_at  = "2026-07-07"
+notes        = "docs/releases/2026.7.0b1.md"
 
 # ---- Python packages (appear in wheelhouse + meta-package deps) ----
 
