@@ -886,9 +886,7 @@ def test_step_systemd_reports_failed_restart(ctx, scripted_systemctl):
     assert ctx.failures == 1
 
 
-def test_step_systemd_starts_inactive_always_service(
-    ctx, scripted_systemctl
-):
+def test_step_systemd_starts_inactive_always_service(ctx, scripted_systemctl):
     # enable-always only *enables* (image-chroot semantics); a live
     # sync must also start a newly staged always-service or it stays
     # dead until reboot. Oneshots are skipped: inactive is their

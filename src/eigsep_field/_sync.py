@@ -781,9 +781,7 @@ def _start_always_units(ctx: SyncContext) -> None:
         if entry.get("activation") != "always":
             continue
         unit = entry["unit"]
-        rc, out = systemctl(
-            "show", "--value", "-p", "Type,ActiveState", unit
-        )
+        rc, out = systemctl("show", "--value", "-p", "Type,ActiveState", unit)
         if rc != 0:
             ctx.fail(f"systemd: cannot inspect {unit}: {out}")
             continue
