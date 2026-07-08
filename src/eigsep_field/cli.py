@@ -55,6 +55,7 @@ from eigsep_field._services import (
     systemctl,
     unit_health,
 )
+from eigsep_field._sync import STEP_ORDER, run_sync
 
 
 def _versions_equal(a: str, b: str) -> bool:
@@ -417,6 +418,10 @@ def _cmd_doctor(_: argparse.Namespace) -> int:
         print(f"  FAIL {line}", file=sys.stderr)
 
     return 1 if (fw_prob or pkg_prob or svc_prob or ext_prob) else 0
+
+
+def _cmd_sync_image(args: argparse.Namespace) -> int:
+    return run_sync(args)
 
 
 def _cmd_services(args: argparse.Namespace) -> int:
@@ -887,6 +892,12 @@ def _apply_redis_snippet(
     if target.is_symlink() or target.exists():
         target.unlink()
     target.symlink_to(snippet)
+    # A failed earlier restart (e.g. against a still-incomplete config
+    # mid-sync) trips StartLimitBurst, and systemd then rejects even a
+    # valid restart with "start request repeated too quickly". The
+    # config was just re-pointed, so clear the slate; rc deliberately
+    # ignored — a healthy unit has nothing to reset.
+    systemctl("reset-failed", "redis-server.service")
     rc, msg = systemctl("restart", "redis-server.service")
     if rc != 0:
         print(f"  warn: redis restart failed: {msg}", file=sys.stderr)
@@ -995,6 +1006,25 @@ def main(argv: list[str] | None = None) -> int:
         "doctor", help="check role, firmware, packages, services"
     ).set_defaults(func=_cmd_doctor)
     _add_services_parser(sub)
+
+    sync = sub.add_parser(
+        "sync-image",
+        help="ONLINE pre-deployment: bring this flashed Pi up to the "
+        "checked-out eigsep-field tree (needs sudo)",
+    )
+    sync.set_defaults(func=_cmd_sync_image)
+    sync.add_argument("--dry-run", action="store_true")
+    step_names = ["self-update", *STEP_ORDER]
+    sync.add_argument(
+        "--skip", action="append", choices=step_names, default=None
+    )
+    sync.add_argument(
+        "--only", action="append", choices=step_names, default=None
+    )
+    sync.add_argument(
+        "--src", default=None, help="eigsep-field tree to sync from"
+    )
+    sync.add_argument("--root", default="/", help=argparse.SUPPRESS)
 
     patch = sub.add_parser(
         "patch",

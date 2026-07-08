@@ -246,6 +246,23 @@ uniform across Pis; per-Pi differentiation is the role set in
    and semantic parity with upstream. CI enforces this via the
    `services-drift` job.
 
+## When adding/removing files staged by the image
+
+`eigsep-field sync-image` replays the image stage on a live Pi from a
+declarative map in `src/eigsep_field/_sync.py` (`FILE_MAP`).
+`tests/test_sync_map.py` fails CI when a file under
+`image/pi-gen-config/stage-eigsep/00-eigsep-install/files/` is not
+covered by the map (or exempted in its `EXCLUDED` set).
+
+- Adding a staged file: if an existing glob (e.g. `systemd/*.service`)
+  covers it, nothing to do; otherwise add a `FileMapEntry`.
+- Removing/renaming a staged file that older images shipped: add the
+  old absolute path to
+  `image/pi-gen-config/stage-eigsep/00-eigsep-install/removed-paths.txt`
+  so sync-image cleans it up in place.
+- apt list lives in `files/apt-packages.txt` (consumed by both
+  `_chroot-install.sh` and sync-image) — not in the shell script.
+
 ## When adding an external (non-redistributable) binary
 
 `[external.*]` entries describe userspace binaries we cannot redistribute

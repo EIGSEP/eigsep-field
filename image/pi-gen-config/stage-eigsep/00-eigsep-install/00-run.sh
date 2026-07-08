@@ -21,6 +21,11 @@ rsync -a files/wheels/    "${ROOTFS_DIR}/opt/eigsep/wheels/"
 rsync -a files/firmware/  "${ROOTFS_DIR}/opt/eigsep/firmware/"
 install -m 0644 files/etc-eigsep/manifest.toml "${ROOTFS_DIR}/etc/eigsep/manifest.toml"
 
+# apt list consumed by _chroot-install.sh inside the chroot (removed
+# there after use) and by `eigsep-field sync-image` from the git tree.
+install -m 0644 files/apt-packages.txt \
+    "${ROOTFS_DIR}/opt/eigsep/apt-packages.txt"
+
 # All unit files in files/systemd/ land in /etc/systemd/system/. The
 # set of files here is the source of truth for the file-copy step; the
 # manifest decides which of them are enabled at build time vs. first boot.

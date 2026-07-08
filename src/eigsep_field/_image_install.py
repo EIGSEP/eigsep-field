@@ -35,8 +35,11 @@ from eigsep_field import load_manifest
 from eigsep_field._services import systemctl
 
 
-def _cmd_enable_always(_: argparse.Namespace) -> int:
-    services = load_manifest().get("services", {})
+def _cmd_enable_always(
+    _: argparse.Namespace, manifest: dict | None = None
+) -> int:
+    manifest = manifest if manifest is not None else load_manifest()
+    services = manifest.get("services", {})
     failed = 0
     enabled = 0
     for name, entry in services.items():
@@ -101,8 +104,10 @@ def _clone_targets(manifest: dict) -> list[CloneTarget]:
     return targets
 
 
-def _cmd_clone_sources(args: argparse.Namespace) -> int:
-    manifest = load_manifest()
+def _cmd_clone_sources(
+    args: argparse.Namespace, manifest: dict | None = None
+) -> int:
+    manifest = manifest if manifest is not None else load_manifest()
     src_root = Path(args.src_root)
     src_root.mkdir(parents=True, exist_ok=True)
 

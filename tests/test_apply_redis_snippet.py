@@ -52,6 +52,27 @@ def staged(tmp_path):
     return src_dir, target
 
 
+def test_reset_failed_clears_start_limit_before_restart(
+    staged, fake_systemctl
+):
+    """A prior failed restart (e.g. the sync-image fatal-include
+    window) trips StartLimitBurst, and systemd then rejects even a
+    valid restart with "start request repeated too quickly" — so the
+    applier must reset-failed first. Its rc is ignored: on a healthy
+    unit there is nothing to reset."""
+    from eigsep_field.cli import _apply_redis_snippet
+
+    src_dir, target = staged
+    calls, rcs = fake_systemctl
+    reset = ("reset-failed", "redis-server.service")
+    rcs[reset] = (1, "Unit redis-server.service not loaded.")
+    rc = _apply_redis_snippet(
+        RoleConfig(role="panda"), src_dir=src_dir, target=target
+    )
+    assert rc == 0
+    assert calls.index(reset) < calls.index(RESTART)
+
+
 def test_backend_links_ephemeral_and_restarts(staged, fake_systemctl):
     from eigsep_field.cli import _apply_redis_snippet
 

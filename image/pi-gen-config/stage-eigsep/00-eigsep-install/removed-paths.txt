@@ -1,0 +1,9 @@
+# Paths an OLDER image may contain that a CURRENT image must not.
+# `eigsep-field sync-image` deletes each existing path; systemd units
+# get `systemctl disable --now` first. Absolute paths, one per line,
+# full-line # comments. This list only grows — removing an entry
+# does not resurrect anything, it only stops the cleanup.
+#
+# eigsep-panda.service: deleted 2026-05-14 — panda_observe is
+# operator-launched, not a systemd service.
+/etc/systemd/system/eigsep-panda.service

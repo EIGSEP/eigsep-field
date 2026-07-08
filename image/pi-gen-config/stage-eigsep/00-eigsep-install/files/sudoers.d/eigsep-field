@@ -7,6 +7,9 @@
 # `capture`, and `src` do not require sudo and should NOT be run with it.
 eigsep ALL=(root) NOPASSWD: /usr/local/bin/eigsep-field patch
 eigsep ALL=(root) NOPASSWD: /usr/local/bin/eigsep-field revert
+# `eigsep-field sync-image` is the ONLINE pre-deployment updater; it
+# rewrites /etc and the venv, so it needs root like patch/revert.
+eigsep ALL=(root) NOPASSWD: /usr/local/bin/eigsep-field sync-image
 # flash-picos auto-stops/restarts picomanager around a flash (the
 # manager owns the Pico serial ports). It tries plain systemctl, then
 # `sudo -n systemctl`; these two rules make the fallback passwordless

@@ -36,22 +36,9 @@ apt-get update
 # for bring-up on the field LAN: ARP sweeps, packet capture, path/DNS
 # checks. Not declared in manifest.toml — apt-only userland with no
 # Python/firmware/binary surface to track.
-apt-get install -y --no-install-recommends \
-    python3 python3-venv python3-pip \
-    redis-server \
-    isc-dhcp-server \
-    chrony \
-    picotool \
-    xvfb \
-    libegl1 libopengl0 libfontconfig1 \
-    libxkbcommon0 libxkbcommon-x11-0 \
-    libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxcb-shape0 libxcb-xkb1 \
-    git curl \
-    vim-nox \
-    screen \
-    arp-scan tcpdump tshark nmap mtr-tiny traceroute iputils-arping dnsutils \
-    build-essential pkg-config libusb-1.0-0-dev cmake \
-    gcc-arm-none-eabi libstdc++-arm-none-eabi-newlib
+grep -vE '^[[:space:]]*(#|$)' /opt/eigsep/apt-packages.txt \
+    | xargs apt-get install -y --no-install-recommends
+rm -f /opt/eigsep/apt-packages.txt
 
 # Overlay dhcp configs after apt-get install, not before in 00-run.sh:
 # pre-existing conffiles in /etc trigger a dpkg prompt that fails under
