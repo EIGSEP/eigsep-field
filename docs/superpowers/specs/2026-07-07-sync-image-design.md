@@ -143,6 +143,13 @@ sudo eigsep-field sync-image [--dry-run] [--skip STEP]... [--only STEP]... [--sr
     no `gh` needed), verify, install to
     `/opt/eigsep/firmware/<kind>/<asset>`. Never flashes. Prints the
     follow-up flash command and flags an active `.field-patch` marker.
+    (amended post-review) When `sha256` is empty (a stable asset name
+    that never changes bytes-for-bytes across a tag bump — the current
+    pico UF2 case), staleness is judged by a sidecar `<asset>.tag`
+    marker instead: written after every successful download, compared
+    against the manifest's `[firmware.*].tag`. A missing marker counts
+    as stale so the first sync after this change re-downloads once and
+    is stable thereafter.
 11. **external** — per role-gated `[external.*]` entry (cmtvna):
     binary missing → run `scripts/install-<name>.sh` in URL-fetch mode;
     present → report OK (vendor CDN is not reliably versioned; no

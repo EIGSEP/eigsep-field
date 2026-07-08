@@ -49,3 +49,7 @@ Notes:
   `flash-picos` (or `eigsep-field revert pico-firmware`).
 - The role step restarts redis-server; don't run mid-observation.
 - Re-running is always safe: every step is idempotent.
+- Whenever the venv gets reinstalled from the wheelhouse (a fresh
+  swap, or recovery from a previous run whose pip install didn't
+  land), restart services or reboot before deployment — check status
+  first with `eigsep-field services list`.
