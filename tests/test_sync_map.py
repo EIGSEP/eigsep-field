@@ -19,6 +19,9 @@ FILES = _sync.files_dir(REPO)
 EXCLUDED = {
     "_chroot-install.sh",  # runs only inside the pi-gen chroot
     "apt-packages.txt",  # consumed by the apt step, not file-copied
+    "wheels",  # image-build output; may exist in a dev tree
+    "firmware",  # image-build output; may exist in a dev tree
+    "eigsep-field-src",  # image-build output; may exist in a dev tree
 }
 
 
