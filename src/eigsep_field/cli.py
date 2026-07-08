@@ -892,6 +892,12 @@ def _apply_redis_snippet(
     if target.is_symlink() or target.exists():
         target.unlink()
     target.symlink_to(snippet)
+    # A failed earlier restart (e.g. against a still-incomplete config
+    # mid-sync) trips StartLimitBurst, and systemd then rejects even a
+    # valid restart with "start request repeated too quickly". The
+    # config was just re-pointed, so clear the slate; rc deliberately
+    # ignored — a healthy unit has nothing to reset.
+    systemctl("reset-failed", "redis-server.service")
     rc, msg = systemctl("restart", "redis-server.service")
     if rc != 0:
         print(f"  warn: redis restart failed: {msg}", file=sys.stderr)

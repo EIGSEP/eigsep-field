@@ -215,6 +215,48 @@ def test_append_redis_includes_fails_cleanly_on_unreadable_conf(ctx):
     assert ctx.failures == 1
 
 
+def test_ensure_redis_role_conf_defaults_missing_symlink(ctx):
+    # Image predating the snippet scheme: redis.conf exists but the
+    # eigsep-role.conf include target doesn't. The include line we
+    # append is fatal on a missing target, so the files step must
+    # default the symlink (role apply re-points it later).
+    redis = ctx.dest("/etc/redis")
+    redis.mkdir(parents=True)
+    (redis / "redis.conf").write_text("bind 0.0.0.0\n")
+    _sync.ensure_redis_role_conf(ctx)
+    link = ctx.dest("/etc/redis/redis.conf.d/eigsep-role.conf")
+    assert link.is_symlink()
+    assert link.readlink() == ctx.dest("/etc/eigsep/redis/persistent.conf")
+    assert ctx.failures == 0
+
+
+def test_ensure_redis_role_conf_keeps_existing_symlink(ctx):
+    redis = ctx.dest("/etc/redis")
+    (redis / "redis.conf.d").mkdir(parents=True)
+    (redis / "redis.conf").write_text("bind 0.0.0.0\n")
+    link = redis / "redis.conf.d" / "eigsep-role.conf"
+    link.symlink_to(ctx.dest("/etc/eigsep/redis/ephemeral.conf"))
+    _sync.ensure_redis_role_conf(ctx)
+    assert link.readlink() == ctx.dest("/etc/eigsep/redis/ephemeral.conf")
+
+
+def test_ensure_redis_role_conf_dry_run_creates_nothing(ctx):
+    redis = ctx.dest("/etc/redis")
+    redis.mkdir(parents=True)
+    (redis / "redis.conf").write_text("bind 0.0.0.0\n")
+    ctx.dry_run = True
+    _sync.ensure_redis_role_conf(ctx)
+    assert not ctx.dest("/etc/redis/redis.conf.d/eigsep-role.conf").exists()
+
+
+def test_ensure_redis_role_conf_noop_without_redis(ctx):
+    # Dev box / no redis installed: append_redis_includes already
+    # fails; ensure must not conjure /etc/redis out of thin air.
+    _sync.ensure_redis_role_conf(ctx)
+    assert not ctx.dest("/etc/redis").exists()
+    assert ctx.failures == 0
+
+
 def test_sudoers_gate_rejects_bad_file(ctx, tree, monkeypatch):
     f = _sync.files_dir(tree) / "sudoers.d"
     f.mkdir()
@@ -805,6 +847,89 @@ def test_step_systemd_passes_tree_manifest(ctx, fake_systemctl):
     ):
         _sync.step_systemd(ctx)
     assert calls == [ctx.manifest]
+
+
+@pytest.fixture
+def scripted_systemctl(monkeypatch):
+    """Capture systemctl calls with per-call scripted (rc, msg)."""
+    calls: list[tuple[str, ...]] = []
+    rcs: dict[tuple[str, ...], tuple[int, str]] = {}
+
+    def _sc(*args):
+        calls.append(args)
+        return rcs.get(args, (0, ""))
+
+    monkeypatch.setattr(_sync, "systemctl", _sc)
+    return calls, rcs
+
+
+def _quiet_enable_always():
+    import unittest.mock as mock
+
+    from eigsep_field import _image_install
+
+    return mock.patch.object(
+        _image_install, "_cmd_enable_always", lambda _, manifest=None: 0
+    )
+
+
+def test_step_systemd_reports_failed_restart(ctx, scripted_systemctl):
+    # The 2026-07-07 panda sync: redis restarted into a fatal missing
+    # include and the step swallowed the nonzero rc, leaving the
+    # first failure invisible until doctor.
+    calls, rcs = scripted_systemctl
+    unit = "redis-server.service"
+    ctx.restart_units.add(unit)
+    rcs[("try-reload-or-restart", unit)] = (1, "control process exited")
+    with _quiet_enable_always():
+        _sync.step_systemd(ctx)
+    assert ctx.failures == 1
+
+
+def test_step_systemd_starts_inactive_always_service(
+    ctx, scripted_systemctl
+):
+    # enable-always only *enables* (image-chroot semantics); a live
+    # sync must also start a newly staged always-service or it stays
+    # dead until reboot. Oneshots are skipped: inactive is their
+    # normal post-run state, and start would re-run them.
+    calls, rcs = scripted_systemctl
+    ctx.manifest["services"] = {
+        "host_health": {
+            "unit": "eigsep-host-health.service",
+            "activation": "always",
+        },
+        "first_boot": {
+            "unit": "eigsep-first-boot.service",
+            "activation": "always",
+        },
+        "observe": {
+            "unit": "eigsep-observe.service",
+            "activation": "role",
+            "role": "backend",
+        },
+    }
+    show = ("show", "--value", "-p", "Type,ActiveState")
+    rcs[(*show, "eigsep-host-health.service")] = (0, "simple\ninactive")
+    rcs[(*show, "eigsep-first-boot.service")] = (0, "oneshot\ninactive")
+    with _quiet_enable_always():
+        _sync.step_systemd(ctx)
+    assert ("start", "eigsep-host-health.service") in calls
+    assert ("start", "eigsep-first-boot.service") not in calls
+    assert ("start", "eigsep-observe.service") not in calls
+    assert ctx.failures == 0
+
+
+def test_step_systemd_skips_active_always_service(ctx, scripted_systemctl):
+    calls, rcs = scripted_systemctl
+    ctx.manifest["services"] = {
+        "redis": {"unit": "redis-server.service", "activation": "always"},
+    }
+    show = ("show", "--value", "-p", "Type,ActiveState")
+    rcs[(*show, "redis-server.service")] = (0, "notify\nactive")
+    with _quiet_enable_always():
+        _sync.step_systemd(ctx)
+    assert ("start", "redis-server.service") not in calls
 
 
 def test_run_sync_dry_run_smoke_on_real_repo(capsys):

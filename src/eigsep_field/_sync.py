@@ -264,6 +264,33 @@ def append_redis_includes(ctx: SyncContext) -> None:
         conf.write_text(body)
 
 
+def ensure_redis_role_conf(ctx: SyncContext) -> None:
+    """Default the eigsep-role.conf symlink when it doesn't exist.
+
+    A redis ``include`` of a missing file is fatal at startup, and the
+    include line appended above lands on images that predate the
+    snippet scheme *before* apply-role creates the symlink — any redis
+    restart inside that window fails hard (2026-07-07 panda sync:
+    rapid auto-restart failures tripped StartLimitBurst and wedged
+    picomanager). Point it at persistent.conf — the pre-role image
+    default — and leave re-pointing to ``_apply_redis_snippet``. An
+    existing link is left alone even if it dangles: the files loop has
+    already (re)installed both snippets by the time this runs.
+    """
+    if not ctx.dest("/etc/redis/redis.conf").exists():
+        # No redis here; append_redis_includes already failed.
+        return
+    link = ctx.dest("/etc/redis/redis.conf.d/eigsep-role.conf")
+    if link.is_symlink() or link.exists():
+        return
+    if ctx.dry_run:
+        ctx.note(f"would default {link} -> persistent.conf")
+        return
+    link.parent.mkdir(parents=True, exist_ok=True)
+    link.symlink_to(ctx.dest("/etc/eigsep/redis/persistent.conf"))
+    ctx.note(f"defaulted {link} -> persistent.conf")
+
+
 def _sudoers_ok(data: bytes) -> bool:
     with tempfile.NamedTemporaryFile(suffix=".sudoers") as tf:
         tf.write(data)
@@ -735,9 +762,41 @@ def step_files(ctx: SyncContext) -> None:
             ctx.restart_units.add(entry.unit)
     refresh_etc_manifest(ctx)
     append_redis_includes(ctx)
+    ensure_redis_role_conf(ctx)
     if udev_changed and not ctx.dry_run:
         if _run(["udevadm", "control", "--reload"]).returncode != 0:
             ctx.fail("udevadm control --reload failed")
+
+
+def _start_always_units(ctx: SyncContext) -> None:
+    """Start always-services that aren't running.
+
+    ``_cmd_enable_always`` only *enables* — correct in the image
+    chroot, where nothing can be started, but on a live sync a newly
+    staged always-service would stay dead until reboot (and doctor
+    FAILs it). Oneshot units are skipped: inactive is their normal
+    post-run state, and a start would re-run them.
+    """
+    for name, entry in ctx.manifest.get("services", {}).items():
+        if entry.get("activation") != "always":
+            continue
+        unit = entry["unit"]
+        rc, out = systemctl(
+            "show", "--value", "-p", "Type,ActiveState", unit
+        )
+        if rc != 0:
+            ctx.fail(f"systemd: cannot inspect {unit}: {out}")
+            continue
+        parts = out.splitlines()
+        type_ = parts[0] if parts else ""
+        active = parts[1] if len(parts) > 1 else ""
+        if type_ == "oneshot" or active == "active":
+            continue
+        rc, msg = systemctl("start", unit)
+        if rc != 0:
+            ctx.fail(f"systemd: start {unit}: {msg}")
+        else:
+            ctx.note(f"started {unit} ({name})")
 
 
 def step_systemd(ctx: SyncContext) -> None:
@@ -758,7 +817,10 @@ def step_systemd(ctx: SyncContext) -> None:
     systemctl("disable", "systemd-timesyncd.service")
     systemctl("mask", "systemd-timesyncd.service")
     for unit in sorted(ctx.restart_units):
-        systemctl("try-reload-or-restart", unit)
+        rc, msg = systemctl("try-reload-or-restart", unit)
+        if rc != 0:
+            ctx.fail(f"systemd: restart {unit}: {msg}")
+    _start_always_units(ctx)
 
 
 def step_role(ctx: SyncContext) -> None:
