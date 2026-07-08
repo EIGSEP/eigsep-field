@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import shutil
 import subprocess
 import tarfile
+import time
 from pathlib import Path
 
 import pytest
@@ -84,6 +86,25 @@ def test_dry_run_writes_nothing(ctx, tree):
     assert not ctx.dest("/etc/udev/rules.d/usb-demo.rules").exists()
 
 
+@pytest.mark.skipif(os.geteuid() == 0, reason="root bypasses file perms")
+def test_install_file_dry_run_survives_unreadable_dest(ctx, tree):
+    """Non-root --dry-run must not crash on a root-owned dest it can't
+    read (real Pi: /etc/redis/redis.conf is 0640 redis:redis,
+    /etc/sudoers.d/eigsep-field is 0440 root)."""
+    entry = _sync.FileMapEntry("systemd/*.service", "/etc/systemd/system")
+    src = _sync.files_dir(tree) / "systemd" / "demo.service"
+    dest = ctx.dest("/etc/systemd/system/demo.service")
+    dest.parent.mkdir(parents=True)
+    dest.write_text("old")
+    dest.chmod(0o000)
+    ctx.dry_run = True
+    try:
+        assert _sync.install_file(ctx, entry, src) is True
+    finally:
+        dest.chmod(0o644)
+    assert ctx.failures == 0
+
+
 def test_iter_map_files_missing_nonglob_raises(tmp_path):
     t = tmp_path / "empty"
     _sync.files_dir(t).mkdir(parents=True)
@@ -151,6 +172,47 @@ def test_append_redis_includes_idempotent(ctx):
     body = conf.read_text()
     assert body.count("include /etc/redis/redis.conf.d/eigsep.conf") == 1
     assert body.count("include /etc/redis/redis.conf.d/eigsep-role.conf") == 1
+
+
+def test_append_redis_includes_noop_does_not_rewrite(ctx):
+    redis = ctx.dest("/etc/redis")
+    redis.mkdir(parents=True)
+    conf = redis / "redis.conf"
+    conf.write_text("bind 127.0.0.1\n")
+    _sync.append_redis_includes(ctx)
+    before = conf.stat().st_mtime_ns
+    time.sleep(0.01)
+    _sync.append_redis_includes(ctx)
+    assert conf.stat().st_mtime_ns == before
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root bypasses file perms")
+def test_append_redis_includes_dry_run_survives_unreadable_conf(ctx):
+    redis = ctx.dest("/etc/redis")
+    redis.mkdir(parents=True)
+    conf = redis / "redis.conf"
+    conf.write_text("bind 127.0.0.1\n")
+    conf.chmod(0o000)
+    ctx.dry_run = True
+    try:
+        _sync.append_redis_includes(ctx)
+    finally:
+        conf.chmod(0o644)
+    assert ctx.failures == 0
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root bypasses file perms")
+def test_append_redis_includes_fails_cleanly_on_unreadable_conf(ctx):
+    redis = ctx.dest("/etc/redis")
+    redis.mkdir(parents=True)
+    conf = redis / "redis.conf"
+    conf.write_text("bind 127.0.0.1\n")
+    conf.chmod(0o000)
+    try:
+        _sync.append_redis_includes(ctx)
+    finally:
+        conf.chmod(0o644)
+    assert ctx.failures == 1
 
 
 def test_sudoers_gate_rejects_bad_file(ctx, tree, monkeypatch):
@@ -260,11 +322,50 @@ def test_wheelhouse_skips_when_pin_matches(ctx, tmp_path, monkeypatch):
     wh.mkdir()
     (wh / "requirements.txt").write_text("eigsep-field==2026.4.0\n")
     monkeypatch.setattr(_sync, "WHEELHOUSE", wh)
+    monkeypatch.setattr(_sync, "_installed_field_version", lambda: "2026.4.0")
     called = []
     monkeypatch.setattr(_sync, "_download", lambda *a: called.append(a))
+    runs = []
+    monkeypatch.setattr(_sync, "_run", lambda cmd, **kw: runs.append(cmd))
     _sync.step_wheelhouse(ctx)
     assert called == []
+    assert runs == []
     assert ctx.failures == 0
+
+
+def test_wheelhouse_reinstalls_when_venv_behind_pin(
+    ctx, tmp_path, monkeypatch
+):
+    """A prior run swapped the wheelhouse but the pip install failed
+    (or never ran): pin == release must not short-circuit forever."""
+    wh = tmp_path / "wheels"
+    wh.mkdir()
+    (wh / "requirements.txt").write_text("eigsep-field==2026.4.0\n")
+    monkeypatch.setattr(_sync, "WHEELHOUSE", wh)
+    monkeypatch.setattr(_sync, "_installed_field_version", lambda: "2026.3.0")
+    runs = []
+
+    def fake_run(cmd, **kw):
+        runs.append(cmd)
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+
+    monkeypatch.setattr(_sync, "_run", fake_run)
+    _sync.step_wheelhouse(ctx)
+    pip = str(_sync.VENV_PATH / "bin" / "pip")
+    assert any(c[:2] == [pip, "install"] and "-r" in c for c in runs)
+
+
+def test_wheelhouse_reinstall_skipped_in_dry_run(ctx, tmp_path, monkeypatch):
+    wh = tmp_path / "wheels"
+    wh.mkdir()
+    (wh / "requirements.txt").write_text("eigsep-field==2026.4.0\n")
+    monkeypatch.setattr(_sync, "WHEELHOUSE", wh)
+    monkeypatch.setattr(_sync, "_installed_field_version", lambda: "2026.3.0")
+    runs = []
+    monkeypatch.setattr(_sync, "_run", lambda cmd, **kw: runs.append(cmd))
+    ctx.dry_run = True
+    _sync.step_wheelhouse(ctx)
+    assert runs == []
 
 
 def test_wheelhouse_swap_and_pip(ctx, tmp_path, monkeypatch):
@@ -381,6 +482,7 @@ def test_firmware_present_no_pin_is_kept(panda_ctx, monkeypatch):
     blessed = panda_ctx.dest("/opt/eigsep/firmware/pico/pico_multi.uf2")
     blessed.parent.mkdir(parents=True)
     blessed.write_bytes(b"OLD")
+    (blessed.parent / "pico_multi.uf2.tag").write_text("v4.1.0\n")
     monkeypatch.setattr(
         _sync,
         "_download",
@@ -388,6 +490,60 @@ def test_firmware_present_no_pin_is_kept(panda_ctx, monkeypatch):
     )
     _sync.step_firmware(panda_ctx)
     assert blessed.read_bytes() == b"OLD"
+
+
+def test_firmware_tag_bump_refetches(panda_ctx, monkeypatch):
+    """sha256 == "" (a stable asset name) means the tag marker is the
+    only staleness signal; a bumped [firmware.*].tag must refresh the
+    blob even though the blob itself is present."""
+    blessed = panda_ctx.dest("/opt/eigsep/firmware/pico/pico_multi.uf2")
+    blessed.parent.mkdir(parents=True)
+    blessed.write_bytes(b"OLD")
+    (blessed.parent / "pico_multi.uf2.tag").write_text("v4.0.0\n")
+    got = []
+
+    def fake_download(url, dest):
+        got.append(url)
+        dest.write_bytes(b"NEW")
+
+    monkeypatch.setattr(_sync, "_download", fake_download)
+    _sync.step_firmware(panda_ctx)
+    assert blessed.read_bytes() == b"NEW"
+    assert got == [
+        "https://github.com/EIGSEP/pico-firmware"
+        "/releases/download/v4.1.0/pico_multi.uf2"
+    ]
+    marker = (blessed.parent / "pico_multi.uf2.tag").read_text().strip()
+    assert marker == "v4.1.0"
+
+
+def test_firmware_missing_tag_marker_counts_as_stale(panda_ctx, monkeypatch):
+    """No marker at all (first sync after this feature lands) refetches
+    once; that's intended — we're online."""
+    blessed = panda_ctx.dest("/opt/eigsep/firmware/pico/pico_multi.uf2")
+    blessed.parent.mkdir(parents=True)
+    blessed.write_bytes(b"OLD")
+    monkeypatch.setattr(
+        _sync, "_download", lambda url, dest: dest.write_bytes(b"NEW")
+    )
+    _sync.step_firmware(panda_ctx)
+    assert blessed.read_bytes() == b"NEW"
+    marker = (blessed.parent / "pico_multi.uf2.tag").read_text().strip()
+    assert marker == "v4.1.0"
+
+
+def test_firmware_download_error_cleans_partial_tmp(panda_ctx, monkeypatch):
+    import urllib.error
+
+    def fake_download(url, dest):
+        dest.write_bytes(b"PARTIAL")
+        raise urllib.error.URLError("boom")
+
+    monkeypatch.setattr(_sync, "_download", fake_download)
+    _sync.step_firmware(panda_ctx)
+    tmp = panda_ctx.dest("/opt/eigsep/firmware/pico/pico_multi.uf2.sync-tmp")
+    assert not tmp.exists()
+    assert panda_ctx.failures == 1
 
 
 def test_firmware_sha_mismatch_refetches(panda_ctx, monkeypatch):
@@ -607,6 +763,50 @@ def test_step_files_tracks_units_and_restarts(ctx, tree):
     assert ctx.dest("/etc/eigsep/manifest.toml").exists()
 
 
+def test_step_dirs_skips_symlink_already_correct(ctx):
+    home = ctx.dest("/home/eigsep")
+    home.mkdir(parents=True)
+    target = ctx.dest("/opt/eigsep/src")
+    target.mkdir(parents=True)
+    link = home / "src"
+    link.symlink_to(target)
+    before_ino = link.lstat().st_ino
+    _sync.step_dirs(ctx)
+    assert link.is_symlink()
+    assert link.lstat().st_ino == before_ino
+    assert ctx.failures == 0
+
+
+def test_step_dirs_refuses_real_directory_at_link_path(ctx):
+    home = ctx.dest("/home/eigsep")
+    home.mkdir(parents=True)
+    real_dir = home / "src"
+    real_dir.mkdir()
+    (real_dir / "keepme").write_text("x")
+    _sync.step_dirs(ctx)
+    assert real_dir.is_dir() and not real_dir.is_symlink()
+    assert (real_dir / "keepme").exists()
+    assert ctx.failures == 1
+
+
+def test_step_systemd_passes_tree_manifest(ctx, fake_systemctl):
+    import unittest.mock as mock
+
+    from eigsep_field import _image_install
+
+    calls = []
+
+    def fake_enable_always(_, manifest=None):
+        calls.append(manifest)
+        return 0
+
+    with mock.patch.object(
+        _image_install, "_cmd_enable_always", fake_enable_always
+    ):
+        _sync.step_systemd(ctx)
+    assert calls == [ctx.manifest]
+
+
 def test_run_sync_dry_run_smoke_on_real_repo(capsys):
     import argparse
 
@@ -627,6 +827,44 @@ def test_run_sync_only_and_skip_selection():
     sel = _sync.select_steps(only=["files", "verify"], skip=["verify"])
     assert sel == ["files"]
     assert _sync.select_steps(only=None, skip=None) == list(_sync.STEP_ORDER)
+
+
+def test_run_sync_isolates_step_crash(monkeypatch, capsys):
+    import argparse
+
+    def boom(_ctx):
+        raise RuntimeError("kaboom")
+
+    monkeypatch.setitem(_sync.STEPS, "verify", boom)
+    args = argparse.Namespace(
+        src=str(REPO), root="/", dry_run=True, skip=None, only=["verify"]
+    )
+    rc = _sync.run_sync(args)
+    captured = capsys.readouterr()
+    assert rc == 1
+    assert "verify: step crashed: kaboom" in captured.err
+    assert "sync-image: 1 failure(s)" in captured.out
+
+
+def test_run_sync_refuses_nonroot_path_outside_dry_run(
+    tmp_path, monkeypatch, capsys
+):
+    import argparse
+
+    # Simulate a real root run so the assertion targets the new --root
+    # guard specifically, not the pre-existing euid check (both return
+    # 2, but for different reasons).
+    monkeypatch.setattr(_sync.os, "geteuid", lambda: 0)
+    args = argparse.Namespace(
+        src=str(REPO),
+        root=str(tmp_path / "fake-root"),
+        dry_run=False,
+        skip=None,
+        only=["files"],
+    )
+    rc = _sync.run_sync(args)
+    assert rc == 2
+    assert "--root" in capsys.readouterr().err
 
 
 def test_cli_wires_sync_image(monkeypatch):

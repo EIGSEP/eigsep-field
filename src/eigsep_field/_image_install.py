@@ -35,8 +35,11 @@ from eigsep_field import load_manifest
 from eigsep_field._services import systemctl
 
 
-def _cmd_enable_always(_: argparse.Namespace) -> int:
-    services = load_manifest().get("services", {})
+def _cmd_enable_always(
+    _: argparse.Namespace, manifest: dict | None = None
+) -> int:
+    manifest = manifest if manifest is not None else load_manifest()
+    services = manifest.get("services", {})
     failed = 0
     enabled = 0
     for name, entry in services.items():

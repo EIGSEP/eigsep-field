@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import os
+import pwd
 import re
 import shutil
 import subprocess
@@ -38,7 +39,7 @@ from eigsep_field._services import (
     entry_for_role,
     parse_role_file,
     systemctl,
-)  # noqa: F401 (later steps)
+)
 
 STAGE_REL = "image/pi-gen-config/stage-eigsep/00-eigsep-install"
 
@@ -195,9 +196,10 @@ def refresh_etc_manifest(ctx: SyncContext) -> None:
     """Tree manifest → /etc/eigsep/manifest.toml, [image] preserved."""
     dest = ctx.dest("/etc/eigsep/manifest.toml")
     text = (ctx.tree / "manifest.toml").read_text()
+    dest_text = dest.read_text() if dest.exists() else None
     image: dict = {}
-    if dest.exists():
-        image = tomllib.loads(dest.read_text()).get("image", {})
+    if dest_text:
+        image = tomllib.loads(dest_text).get("image", {})
     if image:
         lines = ["", "[image]"]
         for k, v in image.items():
@@ -206,7 +208,7 @@ def refresh_etc_manifest(ctx: SyncContext) -> None:
             else:
                 lines.append(f'{k} = "{v}"')
         text += "\n".join(lines) + "\n"
-    if dest.exists() and dest.read_text() == text:
+    if dest_text == text:
         return
     if ctx.dry_run:
         ctx.note(f"would refresh {dest}")
@@ -232,10 +234,23 @@ REDIS_INCLUDES = (
 def append_redis_includes(ctx: SyncContext) -> None:
     """Idempotent include lines, mirroring _chroot-install.sh."""
     conf = ctx.dest("/etc/redis/redis.conf")
-    if not conf.exists():
-        ctx.fail(f"{conf} missing (redis-server not installed?)")
+    try:
+        if not conf.exists():
+            ctx.fail(f"{conf} missing (redis-server not installed?)")
+            return
+        body = conf.read_text()
+    except PermissionError:
+        # Real Pi: redis.conf is 0640 redis:redis; a non-root
+        # --dry-run can't read it for a full preview.
+        if ctx.dry_run:
+            ctx.note(
+                f"cannot read {conf} without root; run with sudo "
+                "for a full preview"
+            )
+        else:
+            ctx.fail(f"cannot read {conf} without root")
         return
-    body = conf.read_text()
+    changed = False
     for comment, include in REDIS_INCLUDES:
         if include in body:
             continue
@@ -243,8 +258,9 @@ def append_redis_includes(ctx: SyncContext) -> None:
             ctx.note(f"would append '{include}' to {conf}")
             continue
         body += f"\n{comment}\n{include}\n"
+        changed = True
         ctx.note(f"appended '{include}' to {conf}")
-    if not ctx.dry_run:
+    if changed and not ctx.dry_run:
         conf.write_text(body)
 
 
@@ -266,11 +282,20 @@ def install_file(ctx: SyncContext, entry: FileMapEntry, src: Path) -> bool:
     would change under --dry-run)."""
     data = _render(ctx, entry, src)
     dest = dest_path(ctx, entry, src)
-    same = (
-        dest.exists()
-        and dest.read_bytes() == data
-        and (dest.stat().st_mode & 0o777) == entry.mode
-    )
+    try:
+        same = (
+            dest.exists()
+            and dest.read_bytes() == data
+            and (dest.stat().st_mode & 0o777) == entry.mode
+        )
+    except PermissionError:
+        # Non-root --dry-run against a real Pi: root-owned dests
+        # (redis.conf.d/eigsep.conf, sudoers.d/eigsep-field) can't be
+        # read for comparison. A real (root) run never hits this.
+        if ctx.dry_run:
+            ctx.note(f"would install {dest} (cannot compare without root)")
+            return True
+        raise
     if same:
         return False
     if entry.special == "sudoers" and not _sudoers_ok(data):
@@ -339,6 +364,33 @@ def wheelhouse_pin(wheels: Path) -> str | None:
     return m.group(1) if m else None
 
 
+def _installed_field_version() -> str | None:
+    """The eigsep-field version installed in this venv, or None."""
+    from importlib.metadata import PackageNotFoundError, version
+
+    try:
+        return version("eigsep-field")
+    except PackageNotFoundError:
+        return None
+
+
+def _versions_equal(a: str, b: str) -> bool:
+    """Tolerant version compare (e.g. 2026.04 == 2026.4).
+
+    Mirrors cli._versions_equal, replicated locally rather than
+    imported (cli imports run_sync from this module, so importing
+    cli here would be circular). packaging is not a hard dependency
+    of eigsep-field — it rides along transitively via pip/setuptools
+    — so fall back to a plain string compare if it's ever missing.
+    """
+    try:
+        from packaging.version import Version
+
+        return Version(a) == Version(b)
+    except Exception:
+        return a == b
+
+
 def _pip_install_wheelhouse(ctx: SyncContext) -> None:
     pip = str(VENV_PATH / "bin" / "pip")
     reqs = [WHEELHOUSE / "requirements.txt"]
@@ -383,6 +435,10 @@ def _pip_install_wheelhouse(ctx: SyncContext) -> None:
         r = _run([pip, "install", "--quiet", str(ctx.tree)])
         if r.returncode != 0:
             ctx.fail("pip install <tree> after swap failed")
+    ctx.note(
+        "venv reinstalled — restart services or reboot before "
+        "deployment (eigsep-field services list)"
+    )
 
 
 def step_wheelhouse(ctx: SyncContext) -> None:
@@ -390,7 +446,20 @@ def step_wheelhouse(ctx: SyncContext) -> None:
     release = ctx.manifest["release"]
     pin = wheelhouse_pin(WHEELHOUSE)
     if pin == release:
-        ctx.note(f"wheelhouse already at {release}")
+        installed = _installed_field_version()
+        if installed is not None and _versions_equal(installed, release):
+            ctx.note(f"wheelhouse already at {release}")
+            return
+        # A previous run swapped the wheelhouse but the pip install
+        # never landed (or the venv drifted some other way): pin ==
+        # release must not short-circuit forever.
+        ctx.note(
+            f"wheelhouse at {release} but venv at {installed}; reinstalling"
+        )
+        if ctx.dry_run:
+            ctx.note("would reinstall the venv from the wheelhouse")
+        else:
+            _pip_install_wheelhouse(ctx)
         return
     platform = ctx.manifest.get("system", {}).get("platform", "linux_aarch64")
     asset = f"wheels-{platform}.tar.xz"
@@ -477,11 +546,26 @@ def step_firmware(ctx: SyncContext) -> None:
             ctx.note(f"firmware {kind}: skipped (role {role})")
             continue
         blessed = ctx.dest(f"/opt/eigsep/firmware/{kind}/{asset}")
+        tag_marker = blessed.with_name(asset + ".tag")
         want = entry.get("sha256", "")
-        if blessed.exists() and (not want or _sha256(blessed) == want):
+        tag = entry["tag"]
+        if not blessed.exists():
+            stale = True
+        elif want:
+            stale = _sha256(blessed) != want
+        else:
+            # No sha to pin against (stable asset name): a tag bump
+            # is the only staleness signal. A missing marker (first
+            # sync after this feature landed) counts as stale too —
+            # it self-heals after one re-download.
+            marker_tag = (
+                tag_marker.read_text().strip() if tag_marker.exists() else None
+            )
+            stale = marker_tag != tag
+        if not stale:
             ctx.note(f"firmware {kind}: {asset} up to date")
             continue
-        url = f"{entry['source']}/releases/download/{entry['tag']}/{asset}"
+        url = f"{entry['source']}/releases/download/{tag}/{asset}"
         if ctx.dry_run:
             ctx.note(f"would download {url}")
             continue
@@ -491,12 +575,15 @@ def step_firmware(ctx: SyncContext) -> None:
             _download(url, tmp)
         except (urllib.error.HTTPError, urllib.error.URLError) as e:
             ctx.fail(f"firmware {kind}: download {url}: {e}")
+            if tmp.exists():
+                tmp.unlink()
             continue
         if want and _sha256(tmp) != want:
             ctx.fail(f"firmware {kind}: sha256 mismatch; keeping old")
             tmp.unlink()
             continue
         tmp.replace(blessed)
+        tag_marker.write_text(tag + "\n")
         ctx.note(
             f"firmware {kind}: updated {asset} — flash with "
             "flash-picos / `eigsep-field revert pico-firmware`"
@@ -665,7 +752,7 @@ def step_systemd(ctx: SyncContext) -> None:
             ctx.note(f"unit changed: {unit} (restart to adopt)")
     from eigsep_field import _image_install
 
-    if _image_install._cmd_enable_always(None):
+    if _image_install._cmd_enable_always(None, manifest=ctx.manifest):
         ctx.fail("enable-always reported failures")
     # keep timesyncd from fighting chrony (mirrors _chroot-install.sh)
     systemctl("disable", "systemd-timesyncd.service")
@@ -715,9 +802,20 @@ def step_dirs(ctx: SyncContext) -> None:
         if link.startswith("/home/") and not lp.parent.is_dir():
             continue
         lp.parent.mkdir(parents=True, exist_ok=True)
+        if lp.is_symlink() and os.readlink(lp) == str(target):
+            continue
+        if lp.exists() and lp.is_dir() and not lp.is_symlink():
+            ctx.fail(f"{lp} is a real directory; not replacing")
+            continue
         if lp.is_symlink() or lp.exists():
             lp.unlink()
         lp.symlink_to(target)
+        if link.startswith("/home/eigsep/"):
+            try:
+                pw = pwd.getpwnam("eigsep")
+                os.chown(lp, pw.pw_uid, pw.pw_gid, follow_symlinks=False)
+            except (KeyError, LookupError, OSError):
+                pass
 
 
 def step_verify(ctx: SyncContext) -> None:
@@ -794,6 +892,18 @@ def run_sync(args: argparse.Namespace) -> int:
     if not (tree / "manifest.toml").exists():
         print(f"no manifest.toml under {tree}", file=sys.stderr)
         return 2
+    root = Path(getattr(args, "root", "/") or "/")
+    if not args.dry_run and root != Path("/"):
+        # --root is a test-only escape hatch (argparse.SUPPRESS in the
+        # CLI). A non-"/" root outside --dry-run would mutate a fake
+        # tree while every subprocess call (apt, git, systemctl, pip)
+        # still targets the real system — refuse rather than half-run.
+        print(
+            "sync-image: --root only applies to --dry-run; refusing "
+            "to run for real against a non-/ root",
+            file=sys.stderr,
+        )
+        return 2
     if not args.dry_run and os.geteuid() != 0:
         print("sync-image must run as root (sudo)", file=sys.stderr)
         return 2
@@ -826,12 +936,17 @@ def run_sync(args: argparse.Namespace) -> int:
     ctx = SyncContext(
         tree=tree,
         manifest=manifest,
-        root=Path(getattr(args, "root", "/") or "/"),
+        root=root,
         dry_run=args.dry_run,
     )
     for name in select_steps(args.only, args.skip):
         print(f"== {name} ==")
-        STEPS[name](ctx)
+        try:
+            STEPS[name](ctx)
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except Exception as e:
+            ctx.fail(f"{name}: step crashed: {e}")
     print(
         f"sync-image: {ctx.failures} failure(s)"
         + (" [dry-run]" if ctx.dry_run else "")
