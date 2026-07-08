@@ -67,7 +67,12 @@ def services_for_role(
         if activation == "always":
             out.append((name, entry))
             continue
-        if activation != "role":
+        # "role" (enabled on first boot) and "on-demand" (installed but
+        # started only by the owning process) are both role-scoped for
+        # membership: they belong to this Pi and are controllable here.
+        # The enable paths (enable-always, _apply-role) gate separately on
+        # activation and skip on-demand, so it is never auto-started.
+        if activation not in ("role", "on-demand"):
             continue
         if entry.get("role") == role:
             out.append((name, entry))

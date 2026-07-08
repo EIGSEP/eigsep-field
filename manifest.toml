@@ -286,6 +286,10 @@ platform = "linux_aarch64"
 # activation="role" services are installed but only enabled by
 # eigsep-first-boot.service when /boot/firmware/eigsep-role.conf picks
 # the matching role.
+# activation="on-demand" services are installed but never enabled by the
+# image or first-boot; the owning process (e.g. panda_observe starting
+# cmtvna.service around an S11 sweep) starts/stops them. They are still
+# role-scoped for `eigsep-field services` control and doctor visibility.
 #
 # kind:
 #   apt      — provided by an APT package; no unit file shipped here.
@@ -335,7 +339,7 @@ source_path = "picohost/picomanager.service"
 [services.cmtvna]
 kind        = "sibling"
 unit        = "cmtvna.service"
-activation  = "role"
+activation  = "on-demand"
 role        = "panda"
 source      = "https://github.com/EIGSEP/CMT-VNA"
 # Must match [packages.eigsep-vna].tag — enforced by check-services-drift.

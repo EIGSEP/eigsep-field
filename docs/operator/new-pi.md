@@ -86,9 +86,13 @@ self-disables.
 CMT's `cmtvna` is proprietary and cannot be redistributed under
 eigsep-field's MIT license, so it ships out-of-band: download once on a
 machine with internet, copy to the Pi, then run the install helper.
-The image pre-creates `/opt/eigsep/cmt-vna/` with operator ownership;
-`cmtvna.service` will crash-loop on a fresh panda until this step
-completes.
+The image pre-creates `/opt/eigsep/cmt-vna/` with operator ownership.
+`cmtvna.service` is **on-demand** — the CMT binary busy-loops at ~300%
+CPU whenever it runs, so it is not started at boot; the observe-side
+code (`panda_observe` / `vna_manual`) starts it only around an S11
+measurement and stops it after. Until this install step completes, those
+on-demand starts fail (the binary is missing), so S11 measurements can't
+run.
 
 On a machine with internet (the URL pin lives in `manifest.toml`
 under `[external.cmtvna]`):
@@ -103,8 +107,15 @@ On the panda Pi:
 ```
 sudo /opt/eigsep/src/eigsep-field/scripts/install-cmtvna.sh \
     /tmp/cmtvna-1.7.1-linux-aarch64.tar.gz.zip
-sudo systemctl restart cmtvna.service
-eigsep-field doctor      # cmtvna line should now be `ok`
+# Smoke-test the install: start the on-demand service, confirm it comes
+# up, then leave it stopped (the observe code starts it when needed).
+# These `sudo -n … --no-ask-password` forms are exactly what the image's
+# sudoers drop-in grants the eigsep user passwordless — the same path the
+# observe-side vna_service module uses.
+sudo -n systemctl start --no-ask-password cmtvna.service
+systemctl is-active cmtvna.service    # -> active
+sudo -n systemctl stop  --no-ask-password cmtvna.service   # leave stopped
+eigsep-field doctor   # cmtvna binary line `ok`; service line `on-demand`
 ```
 
 If the Pi happens to have internet (lab bench, WiFi enabled by hand),
