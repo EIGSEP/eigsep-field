@@ -7,10 +7,10 @@
 # After editing this file, run `./scripts/refresh-lock.sh` to regenerate
 # uv.lock, requirements.txt, and requirements-hashed.txt.
 
-release      = "2026.4.0"
+release      = "2026.7.0"
 python       = "3.13"
-released_at  = "2026-04-21"
-notes        = "docs/releases/2026.4.0.md"
+released_at  = "2026-07-08"
+notes        = "docs/releases/2026.7.0.md"
 
 # ---- Python packages (appear in wheelhouse + meta-package deps) ----
 
@@ -42,8 +42,8 @@ recursive_submodules = true
 
 [packages.eigsep-vna]
 pypi    = "eigsep-vna"
-version = "1.3.1"
-tag     = "v1.3.1"
+version = "1.4.0"
+tag     = "v1.4.0"
 source  = "https://github.com/EIGSEP/CMT-VNA"
 sha256  = ""
 
@@ -343,7 +343,7 @@ activation  = "on-demand"
 role        = "panda"
 source      = "https://github.com/EIGSEP/CMT-VNA"
 # Must match [packages.eigsep-vna].tag — enforced by check-services-drift.
-tag         = "v1.3.1"
+tag         = "v1.4.0"
 source_path = "scripts/cmtvna.service"
 
 [services.eigsep_observe]
