@@ -283,6 +283,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="${GITHUB_REF#refs/tags/}"
+          # wheelhouse.yml normally auto-creates the Release for the
+          # blessed tag before this job's upload, but guard here too so
+          # an image-only re-run doesn't depend on that ordering.
+          gh release view "$TAG" >/dev/null 2>&1 || \
+              gh release create "$TAG" --verify-tag \
+                  --title "${TAG#v}" \
+                  --notes-file "docs/releases/${TAG#v}.md"
           gh release upload "$TAG" out/*.part.* out/*.sha256 --clobber
       - name: Upload as workflow artifact
         # Always uploaded so DEV builds are downloadable for QA. For

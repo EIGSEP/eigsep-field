@@ -31,7 +31,24 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release upload "${GITHUB_REF#refs/tags/}" \
+          TAG="${GITHUB_REF#refs/tags/}"
+          REL="$(python3 -c 'import tomllib; print(tomllib.load(open("manifest.toml", "rb"))["release"])')"
+          # Only the blessed tag uploads to a Release (mirrors
+          # image.yml's IS_BLESSED gate). rc/hotfix tags must not fail
+          # here: image.yml fails fast when this run concludes failure,
+          # which would kill their DEV image build too.
+          if [ "$TAG" != "v$REL" ]; then
+              echo "non-blessed tag $TAG (manifest release is $REL); skipping Release upload"
+              exit 0
+          fi
+          # A pushed tag is only a git ref — no GitHub Release object
+          # exists until something creates it, and `gh release upload`
+          # fails with "release not found" (broke v2026.7.0).
+          gh release view "$TAG" >/dev/null 2>&1 || \
+              gh release create "$TAG" --verify-tag \
+                  --title "$REL" \
+                  --notes-file "docs/releases/$REL.md"
+          gh release upload "$TAG" \
               wheels-${{ matrix.platform }}.tar.xz \
               wheels-${{ matrix.platform }}.tar.xz.sha256 \
               --clobber
