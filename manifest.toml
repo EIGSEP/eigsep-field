@@ -7,10 +7,10 @@
 # After editing this file, run `./scripts/refresh-lock.sh` to regenerate
 # uv.lock, requirements.txt, and requirements-hashed.txt.
 
-release      = "2026.7.0"
+release      = "2026.7.1"
 python       = "3.13"
 released_at  = "2026-07-08"
-notes        = "docs/releases/2026.7.0.md"
+notes        = "docs/releases/2026.7.1.md"
 
 # ---- Python packages (appear in wheelhouse + meta-package deps) ----
 
@@ -42,15 +42,15 @@ recursive_submodules = true
 
 [packages.eigsep-vna]
 pypi    = "eigsep-vna"
-version = "1.4.0"
-tag     = "v1.4.0"
+version = "1.4.1"
+tag     = "v1.4.1"
 source  = "https://github.com/EIGSEP/CMT-VNA"
 sha256  = ""
 
 [packages.eigsep_observing]
 pypi    = "eigsep_observing"
-version = "2.11.0"
-tag     = "v2.11.0"
+version = "2.12.0"
+tag     = "v2.12.0"
 source  = "https://github.com/EIGSEP/eigsep_observing"
 sha256  = ""
 
@@ -343,7 +343,7 @@ activation  = "on-demand"
 role        = "panda"
 source      = "https://github.com/EIGSEP/CMT-VNA"
 # Must match [packages.eigsep-vna].tag — enforced by check-services-drift.
-tag         = "v1.4.0"
+tag         = "v1.4.1"
 source_path = "scripts/cmtvna.service"
 
 [services.eigsep_observe]
@@ -357,7 +357,7 @@ activation  = "role"
 role        = "backend"
 source      = "https://github.com/EIGSEP/eigsep_observing"
 # Must match [packages.eigsep_observing].tag — enforced by check-services-drift.
-tag         = "v2.11.0"
+tag         = "v2.12.0"
 source_path = "deploy/systemd/eigsep-observe.service"
 
 [services.eigsep_observe_writer]
@@ -370,7 +370,7 @@ activation  = "role"
 role        = "backend"
 source      = "https://github.com/EIGSEP/eigsep_observing"
 # Must match [packages.eigsep_observing].tag — enforced by check-services-drift.
-tag         = "v2.11.0"
+tag         = "v2.12.0"
 source_path = "deploy/systemd/eigsep-observe-writer.service"
 
 [services.eigsep_host_health]
@@ -387,7 +387,7 @@ unit        = "eigsep-host-health.service"
 activation  = "always"
 source      = "https://github.com/EIGSEP/eigsep_observing"
 # Must match [packages.eigsep_observing].tag — enforced by check-services-drift.
-tag         = "v2.11.0"
+tag         = "v2.12.0"
 source_path = "deploy/systemd/eigsep-host-health.service"
 
 [services.eigsep_panda_target]

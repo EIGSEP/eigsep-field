@@ -239,9 +239,9 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "build", marker = "extra == 'dev'" },
-    { name = "eigsep-observing", specifier = "==2.11.0" },
+    { name = "eigsep-observing", specifier = "==2.12.0" },
     { name = "eigsep-redis", specifier = "==2.3.1" },
-    { name = "eigsep-vna", specifier = "==1.4.0" },
+    { name = "eigsep-vna", specifier = "==1.4.1" },
     { name = "ipython", marker = "extra == 'debug'", specifier = "==9.13.0" },
     { name = "matplotlib", marker = "extra == 'debug'", specifier = "==3.11.0" },
     { name = "picohost", specifier = "==4.2.0" },
@@ -258,7 +258,7 @@ provides-extras = ["debug", "dev"]
 
 [[package]]
 name = "eigsep-observing"
-version = "2.11.0"
+version = "2.12.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "eigsep-redis" },
@@ -271,9 +271,9 @@ dependencies = [
     { name = "plotly" },
     { name = "pyyaml" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/5d/e4/e95aa541ceed03efb051e5a145685c371bd084e49969bcced6a040cba889/eigsep_observing-2.11.0.tar.gz", hash = "sha256:9d8cfcbfd363a7331416b23d7a12c0173d398be25b8dacaf2a6d2d32a4bb3c0d", size = 3420732, upload-time = "2026-07-09T01:14:00.224Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e0/f9/c5968a834ccb2edf4c8bb903cf50fb2d4f9220668dd48d109e69bb75679e/eigsep_observing-2.12.0.tar.gz", hash = "sha256:66d6276aa030680f2abb048ae4420184ff6b7a2b51802aeb1d8a4a000531805d", size = 3422057, upload-time = "2026-07-09T02:41:39.791Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/97/1d/04a108cb55afff89ca4751b11466efc5d955471753474cedb15c810e40ad/eigsep_observing-2.11.0-py3-none-any.whl", hash = "sha256:4caeeb4b7ef6f0f2c02b4b74e375619582814186a8576233ef5877f1053552af", size = 3259406, upload-time = "2026-07-09T01:13:58.318Z" },
+    { url = "https://files.pythonhosted.org/packages/2e/99/21779cd26e9b60d509d356a97298eb80542b0357a3cdf562b14eb7dc34e2/eigsep_observing-2.12.0-py3-none-any.whl", hash = "sha256:c498a4005429688fba647cc31539f73ced39cbd17143d586e833db565a7178bb", size = 3260241, upload-time = "2026-07-09T02:41:38.377Z" },
 ]
 
 [[package]]
@@ -290,7 +290,7 @@ wheels = [
 
 [[package]]
 name = "eigsep-vna"
-version = "1.4.0"
+version = "1.4.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "matplotlib" },
@@ -300,9 +300,9 @@ dependencies = [
     { name = "pyvisa" },
     { name = "pyvisa-py" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/bc/59/a30b8943111f903335831c10016a7329c73aad519e8ddf8f3e0df7fdd96c/eigsep_vna-1.4.0.tar.gz", hash = "sha256:dcfeefdadecf3a1fb0b6999cc4473b623de6c4032216a5248f09f2260f1070be", size = 21919, upload-time = "2026-07-08T17:00:30.765Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b1/1a/06a0f61a719bf1a2ee81805b20fba0408ec7b283c6c136495628088a48e4/eigsep_vna-1.4.1.tar.gz", hash = "sha256:bbb0cb176dfabbe4ac9d27154fa0249aa6b27a9ef4ef53cb13bf346f5a3d3007", size = 22704, upload-time = "2026-07-09T02:34:54.054Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f9/e8/1f7aad61fe815f89fe819a075fd541e16615d65deba32e53943047e2f678/eigsep_vna-1.4.0-py3-none-any.whl", hash = "sha256:aee6b55554f4bffeca34b1cffc6869070efb8ad667e593cd0701099326c09bd5", size = 13864, upload-time = "2026-07-08T17:00:29.71Z" },
+    { url = "https://files.pythonhosted.org/packages/68/34/84b1caf6fee7e79eb5385ee03c2b3d9503eb5b0e6655e76f0e25339933be/eigsep_vna-1.4.1-py3-none-any.whl", hash = "sha256:8c8b8e3f30da98a87e9b7695285af5903752f72101088b9554f663b502a00a65", size = 14234, upload-time = "2026-07-09T02:34:52.984Z" },
 ]
 
 [[package]]
