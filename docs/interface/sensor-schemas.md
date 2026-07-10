@@ -74,10 +74,6 @@ The tables below are regenerated from live imports of `eigsep_observing.io` by
 | `accel_y` | `float` | float → mean of non-error survivors |
 | `accel_z` | `float` | float → mean of non-error survivors |
 | `el_deg` | `float` | float → mean of non-error survivors |
-| `az_deg` | `float` | float → mean of non-error survivors |
-| `az_from_accel_deg` | `float` | float → mean of non-error survivors |
-| `az_from_yaw_deg` | `float` | float → mean of non-error survivors |
-| `az_blend_weight` | `float` | float → mean of non-error survivors |
 
 
 ### `tempctrl_lna`, `tempctrl_load`
@@ -102,6 +98,7 @@ Shared schema object — every listed sensor uses exactly the same fields.
 | `sensor_tripped` | `bool` | bool → any of non-error survivors |
 | `stall_tripped` | `bool` | bool → any of non-error survivors |
 | `runaway_tripped` | `bool` | bool → any of non-error survivors |
+| `sensor_rejects` | `int` | int → min of non-error survivors (expected invariant) |
 | `cooling_enabled` | `bool` | bool → any of non-error survivors |
 | `hysteresis` | `float` | float → mean of non-error survivors |
 | `clamp` | `float` | float → mean of non-error survivors |
@@ -122,6 +119,8 @@ Shared schema object — every listed sensor uses exactly the same fields.
 | `pot_az_cal_slope` | `float` | float → mean of non-error survivors |
 | `pot_az_cal_intercept` | `float` | float → mean of non-error survivors |
 | `pot_az_near_rail` | `bool` | bool → any of non-error survivors |
+| `sp1_term` | `int` | int → min of non-error survivors (expected invariant) |
+| `sp1_term_name` | `str` | str → first if unanimous, else ``UNKNOWN`` |
 
 
 ### `rfswitch`
@@ -249,7 +248,7 @@ Published alongside each VNA measurement. `freqs` (numpy array) is validated sep
 | Constant | Members |
 |---|---|
 | `VNA_S11_CAL_KEYS` | `cal:VNAL`, `cal:VNAO`, `cal:VNAS` |
-| `VNA_S11_MODE_DATA_KEYS['ant']` | `ant`, `load`, `noise` |
+| `VNA_S11_MODE_DATA_KEYS['ant']` | `amb`, `ant`, `load`, `noise`, `sp1_open`, `sp1_short` |
 | `VNA_S11_MODE_DATA_KEYS['rec']` | `rec` |
 <!-- END GENERATED: sensor-schemas -->
 
